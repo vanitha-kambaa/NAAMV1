@@ -37,6 +37,7 @@ export default function HarvestScreen() {
     const [latitude, setLatitude] = useState<string>('');
     const [longitude, setLongitude] = useState<string>('');
     const [isGettingLocation, setIsGettingLocation] = useState(false);
+    const [locationAddress, setLocationAddress] = useState<string>('');
 
     // Step 3 fields (land details)
     const [ownershipType, setOwnershipType] = useState<'owned' | 'leased' | ''>('');
@@ -75,7 +76,7 @@ export default function HarvestScreen() {
 
     // Step 4 fields (tree/coconut details)
     const [treeCount, setTreeCount] = useState('');
-    const [coconutType, setCoconutType] = useState<'local' | 'hybrid' | 'other' | ''>('');
+    const [coconutType, setCoconutType] = useState<'country' | 'hybrid' | 'mixed' | ''>('');
     const [avgTreeAge, setAvgTreeAge] = useState('');
     const [plantingType, setPlantingType] = useState('');
     const [expectedYield, setExpectedYield] = useState('');
@@ -422,6 +423,19 @@ export default function HarvestScreen() {
         fetchStates();
         fetchCoconutVarieties();
     }, []);
+
+    // Fetch address when latitude and longitude are set
+    useEffect(() => {
+        if (latitude && longitude && locationMode === 'manual') {
+            const latNum = parseFloat(latitude);
+            const longNum = parseFloat(longitude);
+            if (!isNaN(latNum) && !isNaN(longNum)) {
+                getAddressFromCoords(latNum, longNum);
+            }
+        } else {
+            setLocationAddress('');
+        }
+    }, [latitude, longitude, locationMode]);
 
     const fetchCoconutVarieties = async () => {
         try {
@@ -849,6 +863,40 @@ export default function HarvestScreen() {
         }
     };
 
+    const getAddressFromCoords = async (lat: number, long: number) => {
+        try {
+            const reverseGeocoded = await Location.reverseGeocodeAsync({
+                latitude: lat,
+                longitude: long
+            });
+
+            if (reverseGeocoded && reverseGeocoded.length > 0) {
+                const addr = reverseGeocoded[0];
+                // Build address string from available components
+                const addressParts = [];
+                if (addr.street) addressParts.push(addr.street);
+                if (addr.streetNumber) addressParts.push(addr.streetNumber);
+                if (addr.district) addressParts.push(addr.district);
+                if (addr.subregion) addressParts.push(addr.subregion);
+                if (addr.city) addressParts.push(addr.city);
+                if (addr.region) addressParts.push(addr.region);
+                if (addr.postalCode) addressParts.push(addr.postalCode);
+                if (addr.country) addressParts.push(addr.country);
+
+                const addressString = addressParts.length > 0 
+                    ? addressParts.join(', ')
+                    : (language === 'ta' ? 'முகவரி பெற முடியவில்லை' : 'Address not available');
+                
+                setLocationAddress(addressString);
+            } else {
+                setLocationAddress(language === 'ta' ? 'முகவரி பெற முடியவில்லை' : 'Address not available');
+            }
+        } catch (error) {
+            console.log('Error getting address:', error);
+            setLocationAddress(language === 'ta' ? 'முகவரி பெற முடியவில்லை' : 'Address not available');
+        }
+    };
+
     const processLocationFromCoords = async (lat: number, long: number) => {
         try {
             const reverseGeocoded = await Location.reverseGeocodeAsync({
@@ -862,6 +910,9 @@ export default function HarvestScreen() {
                 if (addr.postalCode) {
                     setPincode(addr.postalCode);
                 }
+                
+                // Get formatted address
+                await getAddressFromCoords(lat, long);
 
                 // 1. Match State
                 const stateName = addr.region;
@@ -970,13 +1021,55 @@ export default function HarvestScreen() {
 
             // Attempt to reverse geocode and fill fields (optional; we still move to step 3)
             await processLocationFromCoords(location.coords.latitude, location.coords.longitude);
+            
+            // Fetch address for display in alert
+            let addressText = '';
+            try {
+                const reverseGeocoded = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+                if (reverseGeocoded && reverseGeocoded.length > 0) {
+                    const addr = reverseGeocoded[0];
+                    const addressParts = [];
+                    if (addr.street) addressParts.push(addr.street);
+                    if (addr.streetNumber) addressParts.push(addr.streetNumber);
+                    if (addr.district) addressParts.push(addr.district);
+                    if (addr.subregion) addressParts.push(addr.subregion);
+                    if (addr.city) addressParts.push(addr.city);
+                    if (addr.region) addressParts.push(addr.region);
+                    if (addr.postalCode) addressParts.push(addr.postalCode);
+                    if (addr.country) addressParts.push(addr.country);
+                    addressText = addressParts.length > 0 ? addressParts.join(', ') : '';
+                }
+            } catch (addrError) {
+                console.log('Error getting address for alert:', addrError);
+            }
+            
             setAddFarmStep(3); // Move to step 3; do not show state/district/village dropdowns
+
+            // Build alert message with address
+            const lat = location.coords.latitude.toFixed(6);
+            const long = location.coords.longitude.toFixed(6);
+            let alertMessage = '';
+            
+            if (language === 'ta') {
+                alertMessage = `இருப்பிடம் பெறப்பட்டது:\n\n`;
+                if (addressText) {
+                    alertMessage += `முகவரி: ${addressText}\n\n`;
+                }
+                alertMessage += `அட்சரேகை: ${lat}\nதீர்க்கரேகை: ${long}`;
+            } else {
+                alertMessage = `Location captured:\n\n`;
+                if (addressText) {
+                    alertMessage += `Address: ${addressText}\n\n`;
+                }
+                alertMessage += `Latitude: ${lat}\nLongitude: ${long}`;
+            }
 
             Alert.alert(
                 language === 'ta' ? 'வெற்றி' : 'Success',
-                language === 'ta'
-                    ? `இருப்பிடம் பெறப்பட்டது:\nஅட்சரேகை: ${location.coords.latitude.toFixed(6)}\nதீர்க்கரேகை: ${location.coords.longitude.toFixed(6)}`
-                    : `Location captured:\nLatitude: ${location.coords.latitude.toFixed(6)}\nLongitude: ${location.coords.longitude.toFixed(6)}`
+                alertMessage
             );
         } catch (error: any) {
             console.error('Error getting location:', error);
@@ -1052,7 +1145,7 @@ export default function HarvestScreen() {
 
                     setOwnershipType(''); setLandArea(''); setLandUnit('acre'); setIsUnitDropdownOpen(false);
                     setTreeCount(''); setCoconutType(''); setAvgTreeAge(''); setPlantingType(''); setExpectedYield('');
-                    setLatitude(''); setLongitude('');
+                    setLatitude(''); setLongitude(''); setLocationAddress('');
                     setPincode('');
                     setEditingFarmId(null);
 
@@ -1081,6 +1174,7 @@ export default function HarvestScreen() {
         setNewFarmName('');
         setLatitude('');
         setLongitude('');
+        setLocationAddress('');
         setIsAddFarmModalOpen(false);
         setAddFarmStep(1);
         Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'பண்ணை சேமிக்கப்பட்டது' : 'Farm saved successfully');
@@ -1469,7 +1563,7 @@ export default function HarvestScreen() {
                             <View style={styles.farmModalContent}>
                                 <View style={styles.farmModalHeader}>
                                     <ThemedText style={styles.farmModalTitle}>{editingFarmId ? (language === 'ta' ? 'பண்ணை விவரங்களை திருத்த' : 'Edit Farm Details') : (language === 'ta' ? 'பண்ணை விவரங்கள் சேர்க்க' : 'Add Farm Details')}</ThemedText>
-                                    <TouchableOpacity onPress={() => { setIsAddFarmModalOpen(false); setAddFarmStep(1); setNewFarmName(''); setSelectedState(''); setSelectedDistrict(''); setSelectedTaluk(''); setSelectedPanchayat(''); setSelectedVillage(''); setTreeCount(''); setCoconutType(''); setAvgTreeAge(''); setPlantingType(''); setExpectedYield(''); setStateSearch(''); setDistrictSearch(''); setTalukSearch(''); setPanchayatSearch(''); setVillageSearch(''); setLatitude(''); setLongitude(''); setEditingFarmId(null); }}>
+                                    <TouchableOpacity onPress={() => { setIsAddFarmModalOpen(false); setAddFarmStep(1); setNewFarmName(''); setSelectedState(''); setSelectedDistrict(''); setSelectedTaluk(''); setSelectedPanchayat(''); setSelectedVillage(''); setTreeCount(''); setCoconutType(''); setAvgTreeAge(''); setPlantingType(''); setExpectedYield(''); setStateSearch(''); setDistrictSearch(''); setTalukSearch(''); setPanchayatSearch(''); setVillageSearch(''); setLatitude(''); setLongitude(''); setLocationAddress(''); setEditingFarmId(null); }}>
                                         <Ionicons name="close" size={24} color="#fff" />
                                     </TouchableOpacity>
                                 </View>
@@ -1511,8 +1605,10 @@ export default function HarvestScreen() {
 
                                 {/* Step 2: Location fields */}
                                 {addFarmStep === 2 && (
-                                    
-                                    <ScrollView showsVerticalScrollIndicator={false} >
+                                    <>
+                                    <View>
+                                    <View style={styles.modalContainer}>
+                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16, flex: 1 }} >
                                         {locationMode === 'choice' ? (
                                             <View style={{ marginTop: 20 }}>
                                                 <ThemedText style={[styles.inputLabel, { textAlign: 'center', marginBottom: 20 }]}>{language === 'ta' ? 'இருப்பிடம் தேர்ந்தெடுக்கவும்' : 'Select Location Method'}</ThemedText>
@@ -1548,10 +1644,10 @@ export default function HarvestScreen() {
                                                     <ThemedText style={{ color: '#64748b', marginLeft: 8 }}>{language === 'ta' ? 'மீண்டும் செல்க' : 'Back to selection'}</ThemedText>
                                                 </TouchableOpacity>
 
-                                                <View style={[styles.card, { marginTop: 18, alignSelf: 'center', width: '100%', padding: 16, backgroundColor: '#fff', borderRadius: 12, elevation: 2 }]}>
-                                                    <ThemedText style={[styles.title, { fontSize: 20, marginBottom: 12, color: '#0f172a', fontWeight: '700' }]}>{language === 'ta' ? 'இருப்பிடம் தேர்ந்தெடுக்கவும்' : 'Choose location'}</ThemedText>
+                                                <View style={{ marginTop: 18, alignSelf: 'center', width: '100%', padding: 16, backgroundColor: '#fff', borderRadius: 12, elevation: 2 }}>
+                                                    <ThemedText style={{ fontSize: 20, marginBottom: 12, color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'இருப்பிடம் தேர்ந்தெடுக்கவும்' : 'Choose location'}</ThemedText>
 
-                                                    <View style={styles.inputGroup}>
+                                                    <View>
                                                         <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'பின் கோடு' : 'PIN Code'}</ThemedText>
                                                         <TextInput
                                                             placeholder={'642127'}
@@ -1608,12 +1704,27 @@ export default function HarvestScreen() {
                                                 </ThemedText>
 
                                                 {latitude && longitude && (
-                                                    <View style={{ marginBottom: 16, padding: 8, backgroundColor: '#ecfdf5', borderRadius: 8 }}>
-                                                        <ThemedText style={{ fontSize: 12, color: '#059669' }}>
-                                                            {language === 'ta'
-                                                                ? `இருப்பிடம்: ${latitude}, ${longitude}`
-                                                                : `Location: ${latitude}, ${longitude}`}
-                                                        </ThemedText>
+                                                    <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#ecfdf5', borderRadius: 8, borderLeftWidth: 3, borderLeftColor: '#10b981' }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                                                            <Ionicons name="location" size={16} color="#059669" style={{ marginTop: 2 }} />
+                                                            <View style={{ flex: 1 }}>
+                                                                <ThemedText style={{ fontSize: 12, color: '#059669', fontWeight: '600', marginBottom: 4 }}>
+                                                                    {language === 'ta' ? 'இருப்பிடம்' : 'Location'}
+                                                                </ThemedText>
+                                                                {locationAddress ? (
+                                                                    <ThemedText style={{ fontSize: 13, color: '#047857', lineHeight: 18 }}>
+                                                                        {locationAddress}
+                                                                    </ThemedText>
+                                                                ) : (
+                                                                    <ThemedText style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+                                                                        {language === 'ta' ? 'முகவரி பெறுகிறது...' : 'Fetching address...'}
+                                                                    </ThemedText>
+                                                                )}
+                                                                <ThemedText style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                                                                    {latitude}, {longitude}
+                                                                </ThemedText>
+                                                            </View>
+                                                        </View>
                                                     </View>
                                                 )}
 
@@ -1930,26 +2041,31 @@ export default function HarvestScreen() {
                                                 </Modal>
 
                                                 <View style={{ height: 8 }} />
-                                                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                                                    <TouchableOpacity style={styles.backBtn} onPress={() => setAddFarmStep(1)}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Ionicons name="chevron-back" size={16} color="#0f172a" />
-                                                            <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
-                                                        </View>
-                                                    </TouchableOpacity>
-
-                                                    <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !isStep2Valid && styles.nextBtnDisabled]} disabled={!isStep2Valid} onPress={() => { if (isStep2Valid) setAddFarmStep(3); }}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                                            <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
-                                                            <Ionicons name="chevron-forward" size={16} color="#064e3b" />
-                                                        </View>
-                                                    </TouchableOpacity>
-                                                </View>
-
-
                                             </>
                                         )}
                                     </ScrollView>
+                                    {locationMode === 'manual' && (
+                                        <View style={styles.footer}>
+                                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                                                <TouchableOpacity style={styles.backBtn} onPress={() => setAddFarmStep(1)}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Ionicons name="chevron-back" size={16} color="#0f172a" />
+                                                        <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
+                                                    </View>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !isStep2Valid && styles.nextBtnDisabled]} disabled={!isStep2Valid} onPress={() => { if (isStep2Valid) setAddFarmStep(3); }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                                        <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
+                                                        <Ionicons name="chevron-forward" size={16} color="#064e3b" />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                    </View>
+                                    </View>
+                                    </>
                                 )}
 
                                 {/* Step 3: Land details */}
@@ -2031,7 +2147,10 @@ export default function HarvestScreen() {
 
                                 {/* Step 4: Tree / Coconut details */}
                                 {addFarmStep === 4 && (
-                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 }}>
+                                    <>
+                                    <View >
+                                    <View style={styles.modalContainer}>
+                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 ,flex: 1}} >
                                         <ThemedText style={styles.stepSubtitle}>{language === 'ta' ? 'மர விவரங்கள்' : 'Tree Details'}</ThemedText>
 
                                         <View style={{ height: 8 }} />
@@ -2041,7 +2160,7 @@ export default function HarvestScreen() {
 
                                         <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'தேங்காய் வகை *' : 'Coconut Type *'}</ThemedText>
                                         <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-                                            <TouchableOpacity style={[styles.ownershipCard, coconutType === 'local' && styles.ownershipCardSelected]} onPress={() => setCoconutType('local')}>
+                                            <TouchableOpacity style={[styles.ownershipCard, coconutType === 'country' && styles.ownershipCardSelected]} onPress={() => setCoconutType('country')}>
                                                 <View style={{ alignItems: 'center' }}>
                                                     <View style={{ width: 34, height: 34, borderRadius: 18, backgroundColor: '#fde68a', alignItems: 'center', justifyContent: 'center' }}>
                                                         <Ionicons name="ellipse" size={18} color="#b45309" />
@@ -2059,7 +2178,7 @@ export default function HarvestScreen() {
                                                 </View>
                                             </TouchableOpacity>
 
-                                            <TouchableOpacity style={[styles.ownershipCard, coconutType === 'other' && styles.ownershipCardSelected]} onPress={() => setCoconutType('other')}>
+                                            <TouchableOpacity style={[styles.ownershipCard, coconutType === 'mixed' && styles.ownershipCardSelected]} onPress={() => setCoconutType('mixed')}>
                                                 <View style={{ alignItems: 'center' }}>
                                                     <View style={{ width: 34, height: 34, borderRadius: 18, backgroundColor: '#eef2ff', alignItems: 'center', justifyContent: 'center' }}>
                                                         <Ionicons name="sparkles" size={18} color="#7c3aed" />
@@ -2135,29 +2254,41 @@ export default function HarvestScreen() {
                                         </View>
 
                                         <View style={{ height: 12 }} />
-                                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                                            <TouchableOpacity style={styles.backBtn} onPress={() => setAddFarmStep(3)}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Ionicons name="chevron-back" size={16} color="#0f172a" />
-                                                    <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
-                                                </View>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !isStep4Valid && styles.nextBtnDisabled]} disabled={!isStep4Valid} onPress={() => { if (isStep4Valid) setAddFarmStep(5); }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                                    <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
-                                                    <Ionicons name="chevron-forward" size={16} color="#064e3b" />
-                                                </View>
-                                            </TouchableOpacity>
-                                        </View>
+                                        
 
                                         <View style={{ height: 12 }} />
                                     </ScrollView>
+                                    <View style={styles.footer}>                                  
+<View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+<TouchableOpacity style={styles.backBtn} onPress={() => setAddFarmStep(3)}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Ionicons name="chevron-back" size={16} color="#0f172a" />
+        <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
+    </View>
+</TouchableOpacity>
+
+<TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !isStep4Valid && styles.nextBtnDisabled]} disabled={!isStep4Valid} onPress={() => { if (isStep4Valid) setAddFarmStep(5); }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
+        <Ionicons name="chevron-forward" size={16} color="#064e3b" />
+    </View>
+</TouchableOpacity>
+</View>
+</View>
+
+                                    </View>
+                                    </View>
+                                    </>
+                                    
+
                                 )}
 
                                 {/* Step 5: Summary / Review */}
                                 {addFarmStep === 5 && (
-                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 }}>
+                                    <>
+                                    <View>
+                                    <View style={styles.modalContainer}>
+                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 ,flex: 1}} >
                                         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
                                             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Ionicons name="checkmark" size={36} color="#16a34a" />
@@ -2217,7 +2348,7 @@ export default function HarvestScreen() {
                                                 const match = (expectedYieldNum.toString() || '').match(/(\d+[,\d]*)/);
                                                 if (match) return parseInt(match[1].replace(/,/g, '')).toLocaleString();
                                                 return language === 'ta' ? '0' : '0';
-                                            })()} {language === 'ta' ? 'தேங்காய்கள்' : 'nuts'}</ThemedText>
+                                            })()} {language === 'ta' ? 'தேங்காய்கள்/வருடம்' : 'nuts/year'}</ThemedText>
                                             <ThemedText style={{ color: '#475569', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'மொத்த எதிர்பார்க்கப்படும் வருடாந்திர உற்பத்தி' : 'Total estimated annual production'}</ThemedText>
                                         </View>
 
@@ -2228,7 +2359,12 @@ export default function HarvestScreen() {
                                         </View>
 
                                         <View style={{ height: 12 }} />
-                                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                                        
+
+                                        <View style={{ height: 12 }} />
+                                    </ScrollView>
+                                    <View style={styles.footer}>
+                                    <View style={{ flexDirection: 'row', gap: 12 }}>
                                             <TouchableOpacity style={styles.backBtn} onPress={() => setAddFarmStep(4)}>
                                                 <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
                                             </TouchableOpacity>
@@ -2240,9 +2376,10 @@ export default function HarvestScreen() {
                                                 </View>
                                             </TouchableOpacity>
                                         </View>
-
-                                        <View style={{ height: 12 }} />
-                                    </ScrollView>
+                                    </View>
+                                    </View>
+                                    </View>
+                                    </>
                                 )}
                             </View>
                         </View>
@@ -2391,13 +2528,13 @@ export default function HarvestScreen() {
 
             {/* Change Date Modal (styled to match attached screenshot) */}
             <Modal animationType="slide" transparent={true} visible={isChangeDateModalOpen} onRequestClose={() => closeChangeDateModal()}>
-                <SafeAreaView style={{ flex: 1 }} edges={[]}>
+                <SafeAreaView style={{ flex: 1 }} edges={["top","bottom"]}>
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                         style={{ flex: 1 }}
                     >
                         <View style={styles.farmModalOverlay}>
-                            <View style={[styles.farmModalContent, { maxHeight: '70%' }]}>
+                            <View style={[styles.farmModalContent, { height: '80%' }]}>
                                 <View style={styles.farmModalHeader}>
                                     <ThemedText style={styles.farmModalTitle}>{language === 'ta' ? 'அறுவடை அமைப்பு' : 'Harvest Setup'}</ThemedText>
                                     <TouchableOpacity onPress={() => closeChangeDateModal()}>
@@ -2411,207 +2548,212 @@ export default function HarvestScreen() {
                                     <ThemedText style={styles.progressText}>{changeDateFarm ? (language === 'ta' ? (changeDateFarm.land_tname || changeDateFarm.land_name || changeDateFarm.land_id) : (changeDateFarm.land_name || changeDateFarm.land_id)) : (language === 'ta' ? 'முதன்மை பண்ணை' : 'Primary Farm')}</ThemedText>
                                 </View>
 
-                                <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled">
-                                    <View style={{ marginTop: 8 }}>
-                                        {changeDateStep === 1 && (
-                                            <View style={styles.infoNote}>
-                                                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-                                                    <Ionicons name="information-circle-outline" size={18} color="#2563eb" />
-                                                    <ThemedText style={styles.infoText}>{language === 'ta' ? 'உங்கள் கடைசி அறுவடை பற்றிய தகவல்களை எங்களுக்கு சொல்லுங்கள். இது அடுத்த அறுவடை கணக்கிட உதவும்.' : 'Tell us about your last harvest. This will help us predict your next harvest.'}</ThemedText>
+                                <View style={{ height: '80%', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16, flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+                                        <View style={{ marginTop: 8 }}>
+                                            {changeDateStep === 1 && (
+                                                <View style={styles.infoNote}>
+                                                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                                                        <Ionicons name="information-circle-outline" size={18} color="#2563eb" />
+                                                        <ThemedText style={styles.infoText}>{language === 'ta' ? 'உங்கள் கடைசி அறுவடை பற்றிய தகவல்களை எங்களுக்கு சொல்லுங்கள். இது அடுத்த அறுவடை கணக்கிட உதவும்.' : 'Tell us about your last harvest. This will help us predict your next harvest.'}</ThemedText>
+                                                    </View>
                                                 </View>
-                                            </View>
-                                        )}
+                                            )}
 
-                                        <View style={{ height: 12 }} />
+                                            <View style={{ height: 12 }} />
 
+                                            {changeDateStep === 1 ? (
+                                                <>
+                                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'முன்பு அறுவடை செய்துள்ளீர்களா?' : 'Have you harvested before?'}</ThemedText>
+
+                                                    <TouchableOpacity style={[styles.radioCard, changeDateSelection === 'yes' && styles.radioCardSelected]} onPress={() => setChangeDateSelection('yes')}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                            <View style={{ width: 20, height: 20, borderRadius: 12, borderWidth: 2, borderColor: changeDateSelection === 'yes' ? '#10b981' : '#94a3b8', backgroundColor: changeDateSelection === 'yes' ? '#10b981' : '#fff' }} />
+                                                            <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'ஆம், அறுவடை செய்துள்ளேன்' : 'Yes, I have harvested before'}</ThemedText>
+                                                        </View>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity style={[styles.radioCard, changeDateSelection === 'no' && styles.radioCardSelected]} onPress={() => { setChangeDateSelection('no'); setChangeDateValue(null); }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                            <View style={{ width: 20, height: 20, borderRadius: 12, borderWidth: 2, borderColor: changeDateSelection === 'no' ? '#10b981' : '#94a3b8', backgroundColor: changeDateSelection === 'no' ? '#10b981' : '#fff' }} />
+                                                            <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'இல்லை, இது எனது முதல் அறுவடை' : 'No, this will be my first harvest'}</ThemedText>
+                                                        </View>
+                                                    </TouchableOpacity>
+
+                                                    <View style={{ height: 12 }} />
+
+                                                    {changeDateSelection !== 'no' && (
+                                                        <>
+                                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'கடைசியாக எப்போது அறுவடை செய்தீர்கள்?' : 'When did you last harvest?'}</ThemedText>
+                                                            <TouchableOpacity style={styles.dateInput} onPress={() => setShowChangeDatePicker(true)}>
+                                                                <ThemedText style={styles.inputText}>{changeDateValue ? formatDate(changeDateValue) : (language === 'ta' ? 'dd-mm-yyyy' : 'dd-mm-yyyy')}</ThemedText>
+                                                                <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                                                            </TouchableOpacity>
+
+                                                            {showChangeDatePicker && (
+                                                                <DateTimePicker
+                                                                    value={changeDateValue || new Date()}
+                                                                    mode="date"
+                                                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                                    onChange={(e, d) => { setShowChangeDatePicker(Platform.OS === 'ios'); if (d) setChangeDateValue(d); }}
+                                                                />
+                                                            )}
+                                                        </>
+                                                    )}
+
+                                                    <View style={{ height: 12 }} />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {changeDateSelection === 'yes' ? (
+                                                        <>
+                                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'நீங்கள் அறுவடை எவ்வாறு விற்றீர்கள்?' : 'How did you sell the harvest?'}</ThemedText>
+
+                                                            <TouchableOpacity style={[styles.radioCard, changeDateSaleMethod === 'count' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateSaleMethod('count')}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                    <Ionicons name="cube-outline" size={22} color={changeDateSaleMethod === 'count' ? '#0f172a' : '#475569'} />
+                                                                    <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'எண்ணிக்கையில்' : 'By count'}</ThemedText>
+                                                                </View>
+                                                            </TouchableOpacity>
+
+                                                            <TouchableOpacity style={[styles.radioCard, changeDateSaleMethod === 'weight' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateSaleMethod('weight')}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                    <Ionicons name="trending-up-outline" size={22} color={changeDateSaleMethod === 'weight' ? '#0f172a' : '#475569'} />
+                                                                    <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'எடையில்' : 'By weight'}</ThemedText>
+                                                                </View>
+                                                            </TouchableOpacity>
+
+                                                            {/* Inputs depending on sale method */}
+                                                            {changeDateSaleMethod === 'count' && (
+                                                                <>
+                                                                    <View style={{ height: 12 }} />
+                                                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'எத்தனை தேங்காய்கள்?' : 'How many coconuts?'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 500' : 'Eg: 500'} value={changeDateCount} onChangeText={setChangeDateCount} />
+
+                                                                    <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'தோராய எடை (கிராம்)' : 'Approx. Weight/piece (grams)'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 250' : 'Eg: 250'} value={changeDateWeight} onChangeText={setChangeDateWeight} />
+
+                                                                    <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'சராசரி விலை (₹/தேங்காய்)' : 'Average price (₹/count)'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 15.50' : 'Eg: 15.50'} value={changeDateAvgPrice} onChangeText={setChangeDateAvgPrice} />
+                                                                </>
+                                                            )}
+
+                                                            {changeDateSaleMethod === 'weight' && (
+                                                                <>
+                                                                    <View style={{ height: 12 }} />
+                                                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'தோராய எடை (கிலோ)' : 'Approx. Weight/piece (grams)'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 250' : 'Eg: 250'} value={changeDateWeight} onChangeText={setChangeDateWeight} />
+
+                                                                    <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'தோராய எண்ணிக்கை' : 'Approx count(Total)'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 500' : 'Eg: 500'} value={changeDateApproxCount} onChangeText={setChangeDateApproxCount} />
+
+                                                                    <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'சராசரி விலை (₹/கிலோ)' : 'Average price (₹/kg)'}</ThemedText>
+                                                                    <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 15.50' : 'Eg: 15.50'} value={changeDateAvgPrice} onChangeText={setChangeDateAvgPrice} />
+                                                                </>
+                                                            )}
+
+                                                            <View style={{ height: 12 }} />
+                                                        </>
+                                                    ) : (
+                                                        // First-harvest flow options (matching attached UI)
+                                                        <>
+                                                            <View style={[styles.infoNote, { backgroundColor: '#eef6ff', borderLeftColor: '#c7defd' }]}>
+                                                                <ThemedText style={{ color: '#0f172a', fontSize: 13 }}>{language === 'ta' ? 'நீங்கள் எந்த வகையில் விற்பனை செய்யப் போகிறீர்கள்? இங்கு உள்ளவைகளைத் தேர்ந்தெடுக்கவும்.' : 'Choose how you plan to sell your first harvest.'}</ThemedText>
+                                                            </View>
+
+                                                            <View style={{ height: 12 }} />
+
+                                                            <ThemedText style={[styles.inputLabel, { marginBottom: 8 }]}>{language === 'ta' ? 'விற்பனை வகை' : 'Sale type'}</ThemedText>
+
+                                                            <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'green' && styles.radioCardSelected]} onPress={() => setChangeDateFirstHarvestOption('green')}>
+                                                                <View>
+                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                        <Ionicons name="ellipse-outline" size={18} color={changeDateFirstHarvestOption === 'green' ? '#0f172a' : '#475569'} />
+                                                                        <View style={{ flex: 1 }}>
+                                                                            <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'பச்சை தேங்காய்' : 'Green coconut'}</ThemedText>
+                                                                            <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 35-40 நாட்களுக்கு ஒரு முறை' : 'Harvest: 35-40 days per cycle'}</ThemedText>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+                                                            </TouchableOpacity>
+
+                                                            <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'black' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateFirstHarvestOption('black')}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                    <Ionicons name="egg-outline" size={18} color={changeDateFirstHarvestOption === 'black' ? '#0f172a' : '#475569'} />
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'கருப்பு தேங்காய்' : 'Black/dry coconut'}</ThemedText>
+                                                                        <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 50-60 நாட்களுக்கு ஒரு முறை' : 'Harvest: 50-60 days per cycle'}</ThemedText>
+                                                                    </View>
+                                                                </View>
+                                                            </TouchableOpacity>
+
+                                                            <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'copra' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateFirstHarvestOption('copra')}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                    <Ionicons name="nutrition-outline" size={18} color={changeDateFirstHarvestOption === 'copra' ? '#0f172a' : '#475569'} />
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'கொப்பரா' : 'Copra'}</ThemedText>
+                                                                        <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 90+ நாட்களுக்கு ஒரு முறை' : 'Harvest: 90+ days per cycle'}</ThemedText>
+                                                                    </View>
+                                                                </View>
+                                                            </TouchableOpacity>
+
+                                                            {changeDateFirstHarvestOption ? (
+                                                                <View style={{ borderRadius: 8, padding: 12, backgroundColor: '#ecfdf5', borderLeftWidth: 1, borderLeftColor: '#bbf7d0', marginTop: 12 }}>
+                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                        <Ionicons name="calendar-outline" size={18} color="#065f46" />
+                                                                        <View style={{ flex: 1 }}>
+                                                                            <ThemedText style={{ color: '#065f46', fontSize: 13, fontWeight: '600' }}>{language === 'ta' ? 'அடுத்த அறுவடை (தோராயம்)' : 'Next harvest (approx)'}</ThemedText>
+                                                                            <ThemedText style={{ color: '#065f46', marginTop: 6 }}>{formatDate(new Date(Date.now() + (changeDateFirstHarvestOption === 'green' ? 40 : (changeDateFirstHarvestOption === 'black' ? 55 : 90)) * 24 * 60 * 60 * 1000))}</ThemedText>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+                                                            ) : null}
+
+                                                            <View style={{ height: 12 }} />
+                                                        </>
+                                                    )}
+                                                </>
+                                            )}
+                                        </View>
+                                    </ScrollView>
+                                    <View style={styles.footer}>
                                         {changeDateStep === 1 ? (
-                                            <>
-                                                <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'முன்பு அறுவடை செய்துள்ளீர்களா?' : 'Have you harvested before?'}</ThemedText>
-
-                                                <TouchableOpacity style={[styles.radioCard, changeDateSelection === 'yes' && styles.radioCardSelected]} onPress={() => setChangeDateSelection('yes')}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                        <View style={{ width: 20, height: 20, borderRadius: 12, borderWidth: 2, borderColor: changeDateSelection === 'yes' ? '#10b981' : '#94a3b8', backgroundColor: changeDateSelection === 'yes' ? '#10b981' : '#fff' }} />
-                                                        <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'ஆம், அறுவடை செய்துள்ளேன்' : 'Yes, I have harvested before'}</ThemedText>
-                                                    </View>
+                                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                                <TouchableOpacity style={styles.backBtn} onPress={() => closeChangeDateModal()}>
+                                                    <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
                                                 </TouchableOpacity>
 
-                                                <TouchableOpacity style={[styles.radioCard, changeDateSelection === 'no' && styles.radioCardSelected]} onPress={() => { setChangeDateSelection('no'); setChangeDateValue(null); }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                        <View style={{ width: 20, height: 20, borderRadius: 12, borderWidth: 2, borderColor: changeDateSelection === 'no' ? '#10b981' : '#94a3b8', backgroundColor: changeDateSelection === 'no' ? '#10b981' : '#fff' }} />
-                                                        <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'இல்லை, இது எனது முதல் அறுவடை' : 'No, this will be my first harvest'}</ThemedText>
-                                                    </View>
+                                                <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, (changeDateSelection === '' || (changeDateSelection === 'yes' && !changeDateValue)) && styles.nextBtnDisabled]} disabled={changeDateSelection === '' || (changeDateSelection === 'yes' && !changeDateValue)} onPress={handleSaveChangeDate}>
+                                                    <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
                                                 </TouchableOpacity>
-
-                                                <View style={{ height: 12 }} />
-
-                                                {changeDateSelection !== 'no' && (
-                                                    <>
-                                                        <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'கடைசியாக எப்போது அறுவடை செய்தீர்கள்?' : 'When did you last harvest?'}</ThemedText>
-                                                        <TouchableOpacity style={styles.dateInput} onPress={() => setShowChangeDatePicker(true)}>
-                                                            <ThemedText style={styles.inputText}>{changeDateValue ? formatDate(changeDateValue) : (language === 'ta' ? 'dd-mm-yyyy' : 'dd-mm-yyyy')}</ThemedText>
-                                                            <Ionicons name="calendar-outline" size={20} color="#64748b" />
-                                                        </TouchableOpacity>
-
-                                                        {showChangeDatePicker && (
-                                                            <DateTimePicker
-                                                                value={changeDateValue || new Date()}
-                                                                mode="date"
-                                                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                                                onChange={(e, d) => { setShowChangeDatePicker(Platform.OS === 'ios'); if (d) setChangeDateValue(d); }}
-                                                            />
-                                                        )}
-                                                    </>
-                                                )}
-
-                                                <View style={{ height: 16 }} />
-
-                                                <View style={{ flexDirection: 'row', gap: 12 }}>
-                                                    <TouchableOpacity style={styles.backBtn} onPress={() => closeChangeDateModal()}>
-                                                        <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
-                                                    </TouchableOpacity>
-
-                                                    <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, (changeDateSelection === '' || (changeDateSelection === 'yes' && !changeDateValue)) && styles.nextBtnDisabled]} disabled={changeDateSelection === '' || (changeDateSelection === 'yes' && !changeDateValue)} onPress={handleSaveChangeDate}>
-                                                        <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </>
+                                            </View>
                                         ) : (
                                             <>
                                                 {changeDateSelection === 'yes' ? (
-                                                    <>
-                                                        <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'நீங்கள் அறுவடை எவ்வாறு விற்றீர்கள்?' : 'How did you sell the harvest?'}</ThemedText>
-
-                                                        <TouchableOpacity style={[styles.radioCard, changeDateSaleMethod === 'count' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateSaleMethod('count')}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                                <Ionicons name="cube-outline" size={22} color={changeDateSaleMethod === 'count' ? '#0f172a' : '#475569'} />
-                                                                <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'எண்ணிக்கையில்' : 'By count'}</ThemedText>
-                                                            </View>
+                                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                                        <TouchableOpacity style={styles.backBtn} onPress={() => setChangeDateStep(1)}>
+                                                            <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
                                                         </TouchableOpacity>
 
-                                                        <TouchableOpacity style={[styles.radioCard, changeDateSaleMethod === 'weight' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateSaleMethod('weight')}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                                <Ionicons name="trending-up-outline" size={22} color={changeDateSaleMethod === 'weight' ? '#0f172a' : '#475569'} />
-                                                                <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'எடையில்' : 'By weight'}</ThemedText>
-                                                            </View>
+                                                        <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, (!changeDateSaleMethod || (changeDateSaleMethod === 'count' && (!changeDateCount || !changeDateWeight || !changeDateAvgPrice)) || (changeDateSaleMethod === 'weight' && (!changeDateWeight || !changeDateApproxCount || !changeDateAvgPrice))) && styles.nextBtnDisabled]} disabled={!changeDateSaleMethod || (changeDateSaleMethod === 'count' && (!changeDateCount || !changeDateWeight || !changeDateAvgPrice)) || (changeDateSaleMethod === 'weight' && (!changeDateWeight || !changeDateApproxCount || !changeDateAvgPrice))} onPress={handleSaveChangeDate}>
+                                                            <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
                                                         </TouchableOpacity>
-
-                                                        {/* Inputs depending on sale method */}
-                                                        {changeDateSaleMethod === 'count' && (
-                                                            <>
-                                                                <View style={{ height: 12 }} />
-                                                                <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'எத்தனை தேங்காய்கள்?' : 'How many coconuts?'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 500' : 'Eg: 500'} value={changeDateCount} onChangeText={setChangeDateCount} />
-
-                                                                <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'தோராய எடை (கிராம்)' : 'Approx. Weight/piece (grams)'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 250' : 'Eg: 250'} value={changeDateWeight} onChangeText={setChangeDateWeight} />
-
-                                                                <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'சராசரி விலை (₹/தேங்காய்)' : 'Average price (₹/count)'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 15.50' : 'Eg: 15.50'} value={changeDateAvgPrice} onChangeText={setChangeDateAvgPrice} />
-                                                            </>
-                                                        )}
-
-                                                        {changeDateSaleMethod === 'weight' && (
-                                                            <>
-                                                                <View style={{ height: 12 }} />
-                                                                <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'தோராய எடை (கிலோ)' : 'Approx. Weight/piece (grams)'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 250' : 'Eg: 250'} value={changeDateWeight} onChangeText={setChangeDateWeight} />
-
-                                                                <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'தோராய எண்ணிக்கை' : 'Approx count(Total)'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 500' : 'Eg: 500'} value={changeDateApproxCount} onChangeText={setChangeDateApproxCount} />
-
-                                                                <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>{language === 'ta' ? 'சராசரி விலை (₹/கிலோ)' : 'Average price (₹/kg)'}</ThemedText>
-                                                                <TextInput style={styles.input} keyboardType="numeric" placeholder={language === 'ta' ? 'உதா: 15.50' : 'Eg: 15.50'} value={changeDateAvgPrice} onChangeText={setChangeDateAvgPrice} />
-                                                            </>
-                                                        )}
-
-                                                        <View style={{ height: 16 }} />
-
-                                                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                                                            <TouchableOpacity style={styles.backBtn} onPress={() => setChangeDateStep(1)}>
-                                                                <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
-                                                            </TouchableOpacity>
-
-                                                            <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, (!changeDateSaleMethod || (changeDateSaleMethod === 'count' && (!changeDateCount || !changeDateWeight || !changeDateAvgPrice)) || (changeDateSaleMethod === 'weight' && (!changeDateWeight || !changeDateApproxCount || !changeDateAvgPrice))) && styles.nextBtnDisabled]} disabled={!changeDateSaleMethod || (changeDateSaleMethod === 'count' && (!changeDateCount || !changeDateWeight || !changeDateAvgPrice)) || (changeDateSaleMethod === 'weight' && (!changeDateWeight || !changeDateApproxCount || !changeDateAvgPrice))} onPress={handleSaveChangeDate}>
-                                                                <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அடுத்தது' : 'Next'}</ThemedText>
-                                                            </TouchableOpacity>
-                                                        </View>
-
-                                                        <View style={{ height: 24 }} />
-                                                    </>
+                                                    </View>
                                                 ) : (
-                                                    // First-harvest flow options (matching attached UI)
-                                                    <>
-                                                        <View style={[styles.infoNote, { backgroundColor: '#eef6ff', borderLeftColor: '#c7defd' }]}>
-                                                            <ThemedText style={{ color: '#0f172a', fontSize: 13 }}>{language === 'ta' ? 'நீங்கள் எந்த வகையில் விற்பனை செய்யப் போகிறீர்கள்? இங்கு உள்ளவைகளைத் தேர்ந்தெடுக்கவும்.' : 'Choose how you plan to sell your first harvest.'}</ThemedText>
-                                                        </View>
-
-                                                        <View style={{ height: 12 }} />
-
-                                                        <ThemedText style={[styles.inputLabel, { marginBottom: 8 }]}>{language === 'ta' ? 'விற்பனை வகை' : 'Sale type'}</ThemedText>
-
-                                                        <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'green' && styles.radioCardSelected]} onPress={() => setChangeDateFirstHarvestOption('green')}>
-                                                            <View>
-                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                                    <Ionicons name="ellipse-outline" size={18} color={changeDateFirstHarvestOption === 'green' ? '#0f172a' : '#475569'} />
-                                                                    <View style={{ flex: 1 }}>
-                                                                        <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'பச்சை தேங்காய்' : 'Green coconut'}</ThemedText>
-                                                                        <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 35-40 நாட்களுக்கு ஒரு முறை' : 'Harvest: 35-40 days per cycle'}</ThemedText>
-                                                                    </View>
-                                                                </View>
-                                                            </View>
+                                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                                        <TouchableOpacity style={styles.backBtn} onPress={() => setChangeDateStep(1)}>
+                                                            <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'முந்தைய' : 'Back'}</ThemedText>
                                                         </TouchableOpacity>
 
-                                                        <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'black' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateFirstHarvestOption('black')}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                                <Ionicons name="egg-outline" size={18} color={changeDateFirstHarvestOption === 'black' ? '#0f172a' : '#475569'} />
-                                                                <View style={{ flex: 1 }}>
-                                                                    <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'கருப்பு தேங்காய்' : 'Black/dry coconut'}</ThemedText>
-                                                                    <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 50-60 நாட்களுக்கு ஒரு முறை' : 'Harvest: 50-60 days per cycle'}</ThemedText>
-                                                                </View>
-                                                            </View>
+                                                        <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !changeDateFirstHarvestOption && styles.nextBtnDisabled]} disabled={!changeDateFirstHarvestOption} onPress={handleSaveChangeDate}>
+                                                            <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'முடி' : 'Finish'}</ThemedText>
                                                         </TouchableOpacity>
-
-                                                        <TouchableOpacity style={[styles.radioCard, changeDateFirstHarvestOption === 'copra' && styles.radioCardSelected, { marginTop: 8 }]} onPress={() => setChangeDateFirstHarvestOption('copra')}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                                <Ionicons name="nutrition-outline" size={18} color={changeDateFirstHarvestOption === 'copra' ? '#0f172a' : '#475569'} />
-                                                                <View style={{ flex: 1 }}>
-                                                                    <ThemedText style={{ fontSize: 15 }}>{language === 'ta' ? 'கொப்பரா' : 'Copra'}</ThemedText>
-                                                                    <ThemedText style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>{language === 'ta' ? 'அறுவடை: 90+ நாட்களுக்கு ஒரு முறை' : 'Harvest: 90+ days per cycle'}</ThemedText>
-                                                                </View>
-                                                            </View>
-                                                        </TouchableOpacity>
-
-                                                        {changeDateFirstHarvestOption ? (
-                                                            <View style={{ borderRadius: 8, padding: 12, backgroundColor: '#ecfdf5', borderLeftWidth: 1, borderLeftColor: '#bbf7d0', marginTop: 12 }}>
-                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                                    <Ionicons name="calendar-outline" size={18} color="#065f46" />
-                                                                    <View style={{ flex: 1 }}>
-                                                                        <ThemedText style={{ color: '#065f46', fontSize: 13, fontWeight: '600' }}>{language === 'ta' ? 'அடுத்த அறுவடை (தோராயம்)' : 'Next harvest (approx)'}</ThemedText>
-                                                                        <ThemedText style={{ color: '#065f46', marginTop: 6 }}>{formatDate(new Date(Date.now() + (changeDateFirstHarvestOption === 'green' ? 40 : (changeDateFirstHarvestOption === 'black' ? 55 : 90)) * 24 * 60 * 60 * 1000))}</ThemedText>
-                                                                    </View>
-                                                                </View>
-                                                            </View>
-                                                        ) : null}
-
-                                                        <View style={{ height: 16 }} />
-
-                                                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                                                            <TouchableOpacity style={styles.backBtn} onPress={() => setChangeDateStep(1)}>
-                                                                <ThemedText style={{ color: '#0f172a', fontWeight: '700' }}>{language === 'ta' ? 'முந்தைய' : 'Back'}</ThemedText>
-                                                            </TouchableOpacity>
-
-                                                            <TouchableOpacity style={[styles.nextBtn, { flex: 1 }, !changeDateFirstHarvestOption && styles.nextBtnDisabled]} disabled={!changeDateFirstHarvestOption} onPress={handleSaveChangeDate}>
-                                                                <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'முடி' : 'Finish'}</ThemedText>
-                                                            </TouchableOpacity>
-                                                        </View>
-
-                                                        <View style={{ height: 24 }} />
-                                                    </>
+                                                    </View>
                                                 )}
                                             </>
                                         )}
                                     </View>
-                                </ScrollView>
+                                </View>
                             </View>
                         </View>
                     </KeyboardAvoidingView>
@@ -2652,7 +2794,7 @@ export default function HarvestScreen() {
                                             </View>
                                             <View style={styles.summaryRow}>
                                                 <ThemedText style={styles.summaryLabel}>{language === 'ta' ? 'தேங்காய் வகை:' : 'Coconut Type:'}</ThemedText>
-                                                <ThemedText style={styles.summaryValue}>{viewFarmData.coconut_type === 'local' ? (language === 'ta' ? 'நாட்டு' : 'Local') : viewFarmData.coconut_type === 'hybrid' ? (language === 'ta' ? 'கலப்பின' : 'Hybrid') : viewFarmData.coconut_type === 'other' ? (language === 'ta' ? 'மற்றவை' : 'Other') : '-'}</ThemedText>
+                                                <ThemedText style={styles.summaryValue}>{viewFarmData.coconut_type === 'country' ? (language === 'ta' ? 'நாட்டு' : 'Country') : viewFarmData.coconut_type === 'hybrid' ? (language === 'ta' ? 'கலப்பின' : 'Hybrid') : viewFarmData.coconut_type === 'mixed' ? (language === 'ta' ? 'கலப்பு' : 'Mixed') : '-'}</ThemedText>
                                             </View>
                                             <View style={styles.summaryRow}>
                                                 <ThemedText style={styles.summaryLabel}>{language === 'ta' ? 'மர வயது:' : 'Tree Age:'}</ThemedText>
@@ -2678,7 +2820,7 @@ export default function HarvestScreen() {
                                                     const yieldPerTree = parseInt(viewFarmData.expected_yield) || 0;
                                                     const total = treeCount * yieldPerTree;
                                                     return total ? total.toLocaleString() : '0';
-                                                })()} {language === 'ta' ? 'தேங்காய்கள்' : 'Coconuts'}
+                                                })()} {language === 'ta' ? 'தேங்காய்கள்/வருடம்' : 'Coconuts/year'}
                                             </ThemedText>
                                             <ThemedText style={{ color: '#475569', fontSize: 13, marginTop: 6 }}>{language === 'ta' ? 'மொத்த எதிர்பார்க்கப்படும் வருடாந்திர உற்பத்தி' : 'Total estimated annual production'}</ThemedText>
                                         </View>
@@ -2724,7 +2866,18 @@ const styles = StyleSheet.create({
         marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#f1f5f9'
     },
     nextBtnDisabled: { backgroundColor: '#94a3b8', opacity: 0.7 },
-
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+      },
+    modalContainer: {
+        height: '92%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        marginHorizontal: 16,
+        overflow: 'hidden', // 🔥 IMPORTANT
+      },
     summaryCard: { backgroundColor: '#ecfdf5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#bbf7d0' },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 0, borderBottomColor: 'rgba(0,0,0,0.04)' },
     summaryLabel: { color: '#475569', fontSize: 13 },
@@ -2825,9 +2978,13 @@ const styles = StyleSheet.create({
     farmIconWrap: { alignItems: 'center', marginTop: 12, marginBottom: 12 },
     farmIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
     infoNote: { backgroundColor: '#eff6ff', borderLeftWidth: 4, borderLeftColor: '#c7e6ff', padding: 10, marginTop: 5, borderRadius: 8, fontSize: 8 },
-    nextBtn: { backgroundColor: '#86efac', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+    nextBtn: { justifyContent: 'center',backgroundColor: '#86efac', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
     nextBtnText: { color: '#064e3b', fontWeight: '700', fontSize: 16 },
-
+footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+  },
     /* Change date specific */
     radioCard: { backgroundColor: '#fff', paddingVertical: 16, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#e6e6e6', marginTop: 8 },
     radioCardSelected: { borderColor: '#bbf7d0', backgroundColor: '#ecfdf5' },
@@ -2851,7 +3008,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center'
     },
-    backBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff' },
+    backBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff' ,justifyContent: 'center'},
 
     /* Step 3 styles */
     landIconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#faf5ff', alignItems: 'center', justifyContent: 'center' },
