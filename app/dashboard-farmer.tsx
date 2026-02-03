@@ -319,6 +319,30 @@ export default function FarmerDashboard() {
     }
   };
 
+  const recordAdImpression = async (adId?: number | string) => {
+    try {
+      if (!adId) return;
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      await fetch(`${API_CONFIG.BASE_URL}/news-events/${adId}/impression`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (e) {
+      console.log('Failed to record ad impression', e);
+    }
+  };
+
+  const openAdDetails = (ad: any) => {
+    if (!ad) return;
+    recordAdImpression(ad.id);
+    router.push({ pathname: '/ads/[id]', params: { id: String(ad.id) } });
+  };
+
   const handleQuoteInteraction = async (type: 'like' | 'share' | 'view') => {
     try {
       const quoteId = homeData?.motivational_quotes?.active?.[0]?.id;
@@ -569,7 +593,11 @@ export default function FarmerDashboard() {
 
                     {/* hero card for this target */}
                     {hero && (
-                      <TouchableOpacity activeOpacity={0.95} style={styles.heroCard} onPress={() => router.push({ pathname: '/ads/[id]', params: { id: String(hero.id) } })}>
+                      <TouchableOpacity
+                        activeOpacity={0.95}
+                        style={styles.heroCard}
+                        onPress={() => openAdDetails(hero)}
+                      >
                         {hero.image_url && (
                           <RemoteImage uri={hero.image_url && hero.image_url.startsWith('http') ? hero.image_url : (hero.image_url ? `${API_CONFIG.UPLOADS_URL}/news/${hero.image_url}` : undefined)} style={styles.heroImage} resizeMode="cover" />
                         )}
@@ -577,10 +605,7 @@ export default function FarmerDashboard() {
 
                           <ThemedText style={styles.heroTitle}>{language === 'ta' ? (hero.title_tamil ?? hero.title) : hero.title}</ThemedText>
                           <ThemedText style={styles.heroSubtitle}>{language === 'ta' ? (hero.description_tamil ?? hero.description) : hero.description}</ThemedText>
-                          <TouchableOpacity
-                            style={styles.heroCTA}
-                            onPress={() => router.push({ pathname: '/ads/[id]', params: { id: String(hero.id) } })}
-                          >
+                          <TouchableOpacity style={styles.heroCTA} onPress={() => openAdDetails(hero)}>
                             <ThemedText style={styles.heroCTAText}>{hero.button_text ?? (language === 'ta' ? 'விபரம் பெறுங்கள்' : 'Get offer')}</ThemedText>
                           </TouchableOpacity>
                         </View>
@@ -643,26 +668,6 @@ export default function FarmerDashboard() {
                 </View>
               </TouchableOpacity>
             ))}
-          </View>
-
-          {/* Quick actions */}
-          <ThemedText style={styles.sectionLabel}>{language === 'ta' ? 'விரைவு செயல்கள்' : 'Quick Actions'}</ThemedText>
-          <View style={styles.quickActionsWrap}>
-            <View style={styles.quickActionsRow}>
-              <TouchableOpacity style={styles.actionCard} activeOpacity={0.85} onPress={() => router.push('/harvest' as any)}>
-                <View style={[styles.actionCircle, { backgroundColor: '#e6ffef' }]}>
-                  <Ionicons name="add" size={28} color="#059669" />
-                </View>
-                <ThemedText style={styles.actionLabel}>{language === 'ta' ? 'புதிய அறுவடை' : 'New Harvest'}</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionCard} activeOpacity={0.85} onPress={() => router.push('/price-history' as any)}>
-                <View style={[styles.actionCircle, { backgroundColor: '#eaf2ff' }]}>
-                  <Ionicons name="trending-up" size={26} color="#2563eb" />
-                </View>
-                <ThemedText style={styles.actionLabel}>{language === 'ta' ? 'விலை வரலாறு' : 'Price history'}</ThemedText>
-              </TouchableOpacity>
-            </View>
           </View>
 
 
@@ -843,10 +848,11 @@ export default function FarmerDashboard() {
         </Pressable>
       </Modal>
 
-      {/* Motivation Modal */}
-      <Modal visible={motivationModalVisible} transparent animationType="fade" onRequestClose={() => setMotivationModalVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setMotivationModalVisible(false)}>
-          <Pressable style={styles.modalContent} onPress={() => { }}>
+      {/* Motivation Bottom Sheet */}
+      <Modal visible={motivationModalVisible} transparent animationType="slide" onRequestClose={() => setMotivationModalVisible(false)}>
+        <Pressable style={styles.motivationBottomSheetOverlay} onPress={() => setMotivationModalVisible(false)}>
+          <Pressable style={styles.motivationBottomSheetContent} onPress={() => { }}>
+            <View style={styles.motivationBottomSheetHandle} />
             <View style={styles.modalHeader}>
               <ThemedText style={styles.modalTitle}>{language === 'ta' ? 'இன்றைய ஊக்க மொழி' : "Today's Motivation"}</ThemedText>
               <TouchableOpacity onPress={() => setMotivationModalVisible(false)}>
@@ -855,12 +861,25 @@ export default function FarmerDashboard() {
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Ionicons name="chatbox-ellipses-outline" size={48} color="#c05621" style={{ opacity: 0.2, marginBottom: 16 }} />
-                <ThemedText style={[styles.motivationalQuote, { fontSize: 18, textAlign: 'center', lineHeight: 28, color: '#4b5563' }]}>
-                  {homeData?.motivational_quotes?.active?.[0] ? (language === 'ta' ? (homeData.motivational_quotes.active[0].quote_text_tamil ?? homeData.motivational_quotes.active[0].quote_text) : homeData.motivational_quotes.active[0].quote_text) : (language === 'ta' ? 'உங்கள் விவசாயம் தயாரா என்பதை சரிபார்க்க உதவிகள் உள்ளன.' : 'Quick tips to prepare your farm are available.')}
-                </ThemedText>
-              </View>
+              {(() => {
+                const quoteObj = homeData?.motivational_quotes?.active?.[0];
+                const quoteImage = quoteObj?.quote_image;
+                const quoteImageUri = quoteImage
+                  ? (quoteImage.startsWith('http') ? quoteImage : `${API_CONFIG.UPLOADS_URL}/${quoteImage}`)
+                  : undefined;
+                return (
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    {quoteImageUri ? (
+                      <RemoteImage uri={quoteImageUri} style={styles.motivationQuoteImage} resizeMode="cover" />
+                    ) : (
+                      <Ionicons name="chatbox-ellipses-outline" size={48} color="#c05621" style={{ opacity: 0.2, marginBottom: 16 }} />
+                    )}
+                    <ThemedText style={[styles.motivationalQuote, { fontSize: 18, textAlign: 'center', lineHeight: 28, color: '#4b5563', marginTop: quoteImageUri ? 12 : 0 }]}>
+                      {quoteObj ? (language === 'ta' ? (quoteObj.quote_text_tamil ?? quoteObj.quote_text) : quoteObj.quote_text) : (language === 'ta' ? 'உங்கள் விவசாயம் தயாரா என்பதை சரிபார்க்க உதவிகள் உள்ளன.' : 'Quick tips to prepare your farm are available.')}
+                    </ThemedText>
+                  </View>
+                );
+              })()}
             </ScrollView>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-around', borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 16, marginTop: 8 }}>
@@ -872,12 +891,19 @@ export default function FarmerDashboard() {
                 }
               }}>
                 <Ionicons name={quoteLiked ? "heart" : "heart-outline"} size={24} color="#ef4444" />
-                <ThemedText style={{ marginLeft: 8, color: '#4b5563', fontWeight: '600' }}>{language === 'ta' ? 'விருப்பம்' : 'Like'}</ThemedText>
+                <ThemedText style={{ marginLeft: 8, color: '#4b5563', fontWeight: '600' }}>{language === 'ta' ? 'விருப்பம்' : 'Like'} ({(() => {
+                  const q = homeData?.motivational_quotes?.active?.[0];
+                  return Number(q?.likes ?? 0) + (quoteLiked ? 1 : 0);
+                })()})</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }} onPress={handleShareMotivation}>
                 <Ionicons name="share-social-outline" size={24} color="#2563eb" />
-                <ThemedText style={{ marginLeft: 8, color: '#4b5563', fontWeight: '600' }}>{language === 'ta' ? 'பகிர்' : 'Share'}</ThemedText>
+                <ThemedText style={{ marginLeft: 8, color: '#4b5563', fontWeight: '600' }}>{language === 'ta' ? 'பகிர்' : 'Share'} ({Number(homeData?.motivational_quotes?.active?.[0]?.share ?? 0)})</ThemedText>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}>
+                <Ionicons name="eye-outline" size={24} color="#6b7280" />
+                <ThemedText style={{ marginLeft: 8, color: '#4b5563', fontWeight: '600' }}>{language === 'ta' ? 'பார்வை' : 'View'} ({Number(homeData?.motivational_quotes?.active?.[0]?.view ?? 0)})</ThemedText>
+              </View>
             </View>
           </Pressable>
         </Pressable>
@@ -1069,13 +1095,6 @@ const styles = StyleSheet.create({
   newsMeta: { color: '#6b7280', fontSize: 12 },
   newsSnippet: { color: '#4b5563', marginTop: 6, fontSize: 12, lineHeight: 16 },
 
-  /* Quick actions */
-  quickActionsWrap: { width: '100%', maxWidth: 520, marginTop: 12, marginBottom: 12 },
-  quickActionsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, paddingVertical: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#eef2f6' },
-  actionCircle: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  actionLabel: { color: '#0f172a', fontSize: 16, marginTop: 4 },
-
   noteBox: { width: '100%', maxWidth: 520, marginTop: 12, backgroundColor: '#fff8f0', padding: 12, borderRadius: 10 },
   motivationalQuote: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
   noteText: { color: '#8a6b00' },
@@ -1086,6 +1105,12 @@ const styles = StyleSheet.create({
   /* Loan Modal Styles */
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalContent: { width: '100%', maxWidth: 420, backgroundColor: '#ffffff', borderRadius: 12, padding: 20, elevation: 8 },
+
+  /* Motivation Bottom Sheet Styles */
+  motivationBottomSheetOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  motivationBottomSheetContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '85%' },
+  motivationBottomSheetHandle: { width: 40, height: 4, backgroundColor: '#d1d5db', borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  motivationQuoteImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#f3f4f6' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', flex: 1, marginRight: 12 },
   modalBody: { marginBottom: 20 },

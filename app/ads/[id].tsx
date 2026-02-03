@@ -96,6 +96,14 @@ export default function AdDetail() {
         }
     };
 
+    const openExternalUrl = (url: string) => {
+        if (!url || typeof url !== 'string') return;
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+        Linking.openURL(withProtocol);
+    };
+
     const handleLike = async () => {
         if (!id || !data) return;
         try {
@@ -286,7 +294,7 @@ export default function AdDetail() {
                             {data.read_moreurl ? (
                                 <>
                                     <ThemedText style={[styles.sectionTitle, { marginTop: 16 }]}>{language === 'ta' ? 'இணைப்பு' : 'Link'}</ThemedText>
-                                    <TouchableOpacity onPress={() => Linking.openURL(data.read_moreurl)}>
+                                    <TouchableOpacity onPress={() => openExternalUrl(data.read_moreurl)}>
                                         <ThemedText style={styles.readMoreLink}>{data.read_moreurl}</ThemedText>
                                     </TouchableOpacity>
                                 </>
@@ -319,8 +327,17 @@ export default function AdDetail() {
                                         const buttonText = (data.button_text ?? '').toLowerCase().trim();
                                         if (buttonText === 'get quote' || buttonText === 'விலைப்பட்டியல் பெற' || buttonText.includes('quote') || buttonText.includes('offer')) {
                                             setLoanModalVisible(true);
+                                        } else if (buttonText === 'learn more') {
+                                            const url = data.link_url || data.read_moreurl;
+                                            if (url) openExternalUrl(url);
+                                        } else if (buttonText === 'contact us') {
+                                            const contactInfo = data.contact_information || '';
+                                            const phone = String(contactInfo).replace(/\D/g, '');
+                                            const whatsappNumber = phone.startsWith('91') ? phone : (phone.length === 10 ? `91${phone}` : phone);
+                                            const message = encodeURIComponent('This lead is from NAAM app. Can I get more details');
+                                            if (whatsappNumber) Linking.openURL(`https://wa.me/${whatsappNumber}?text=${message}`);
                                         } else if (data.read_moreurl) {
-                                            Linking.openURL(data.read_moreurl);
+                                            openExternalUrl(data.read_moreurl);
                                         }
                                     }}
                                 >

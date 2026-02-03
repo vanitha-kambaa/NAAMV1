@@ -103,6 +103,7 @@ export default function HarvestScreen() {
     const [selectedFarm, setSelectedFarm] = useState<any>(null);
     const [isFarmDropdownOpen, setIsFarmDropdownOpen] = useState(false);
     const [expandedFarmId, setExpandedFarmId] = useState<number | null>(null);
+    const [farmMenuOpenId, setFarmMenuOpenId] = useState<number | string | null>(null);
     const [editingFarmId, setEditingFarmId] = useState<number | null>(null);
     const [isSavingHarvest, setIsSavingHarvest] = useState(false);
 
@@ -1244,12 +1245,12 @@ export default function HarvestScreen() {
 
                 {/* Farm Details Section */}
                 <View style={styles.sectionHeaderRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={styles.sectionTitleWrap}>
                         <Ionicons name="leaf-outline" size={18} color="#166534" />
-                        <ThemedText style={styles.sectionTitle}>{language === 'ta' ? 'எனது பண்ணை விவரங்கள்' : 'My Farm Details'}</ThemedText>
+                        <ThemedText style={styles.sectionTitle} numberOfLines={1} ellipsizeMode="tail">{language === 'ta' ? 'எனது பண்ணைகள்' : 'My Farm Details'}</ThemedText>
                     </View>
-                    <TouchableOpacity onPress={() => { setIsAddFarmModalOpen(true); setAddFarmStep(1); }}>
-                        <ThemedText style={styles.addLink}>{language === 'ta' ? '+ புதிய பண்ணை' : '+ Add Farm'}</ThemedText>
+                    <TouchableOpacity style={styles.addFarmButton} onPress={() => { setIsAddFarmModalOpen(true); setAddFarmStep(1); }}>
+                        <ThemedText style={styles.addFarmButtonText} numberOfLines={1}>{language === 'ta' ? '+ புதிய பண்ணை' : '+ Add Farm'}</ThemedText>
                     </TouchableOpacity>
                 </View>
 
@@ -1269,7 +1270,7 @@ export default function HarvestScreen() {
                                         <ThemedText style={styles.farmName}>{title}</ThemedText>
                                     </TouchableOpacity>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, position: 'relative' }}>
                                         <View style={styles.tag}>
                                             <View style={[styles.tagDot, { backgroundColor: isActive ? '#10b981' : '#94a3b8' }]} />
                                             <ThemedText style={styles.tagText}>{isActive ? (language === 'ta' ? 'பச்சை' : 'Green') : (language === 'ta' ? 'முடக்கப்பட்டது' : 'Inactive')}</ThemedText>
@@ -1278,6 +1279,26 @@ export default function HarvestScreen() {
                                         <TouchableOpacity onPress={() => setExpandedFarmId(expandedFarmId === (farm.land_id || farm.farm_id) ? null : (farm.land_id || farm.farm_id))}>
                                             <Ionicons name={expandedFarmId === (farm.land_id || farm.farm_id) ? 'chevron-up' : 'chevron-down'} size={18} color="#0f172a" />
                                         </TouchableOpacity>
+
+                                        <TouchableOpacity onPress={() => setFarmMenuOpenId(farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) ? null : (farm.land_id || farm.farm_id || farm.id))}>
+                                            <Ionicons name="ellipsis-vertical" size={22} color="#64748b" />
+                                        </TouchableOpacity>
+                                        {farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) && (
+                                            <View style={styles.farmMenuDropdown}>
+                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleViewFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                    <Ionicons name="eye-outline" size={18} color="#3b82f6" />
+                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'பார்க்க' : 'View'}</ThemedText>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleEditFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                    <Ionicons name="create-outline" size={18} color="#f59e0b" />
+                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'திருத்து' : 'Edit'}</ThemedText>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleDeleteFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#ef4444', fontWeight: '500' }}>{language === 'ta' ? 'நீக்கு' : 'Delete'}</ThemedText>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
 
@@ -1289,18 +1310,6 @@ export default function HarvestScreen() {
                                 <View style={styles.farmAlertRow}>
                                     <Ionicons name="calendar-outline" size={14} color="#dc2626" />
                                     <ThemedText style={styles.farmAlert}>{nextHarvest ? `${language === 'ta' ? 'அறுவடை செய்ய வேண்டும்' : 'Due for harvest'} ${formatDate(nextHarvest)}` : (language === 'ta' ? 'அட்டவணை இல்லை' : 'No schedule')}</ThemedText>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                                    <TouchableOpacity onPress={() => handleViewFarm(farm.id || farm.land_id || farm.farm_id)}>
-                                        <Ionicons name="eye-outline" size={20} color="#3b82f6" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => handleEditFarm(farm.id || farm.land_id || farm.farm_id)}>
-                                        <Ionicons name="create-outline" size={20} color="#f59e0b" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => handleDeleteFarm(farm.id || farm.land_id || farm.farm_id)}>
-                                        <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                                    </TouchableOpacity>
                                 </View>
 
                                 {expandedFarmId === (farm.land_id || farm.farm_id) && (
@@ -1358,8 +1367,11 @@ export default function HarvestScreen() {
                         );
                     })
                 ) : (
-                    <View style={styles.farmCard}>
-                        <ThemedText style={{ color: '#64748b' }}>{language === 'ta' ? 'பண்ணைகள் இல்லை' : 'No farms found'}</ThemedText>
+                    <View style={styles.farmCardEmpty}>
+                        <ThemedText style={{ color: '#64748b', marginBottom: 16 }}>{language === 'ta' ? 'பண்ணைகள் இல்லை' : 'No farms found'}</ThemedText>
+                        <TouchableOpacity style={styles.addFarmButton} onPress={() => { setIsAddFarmModalOpen(true); setAddFarmStep(1); }}>
+                            <ThemedText style={styles.addFarmButtonText}>{language === 'ta' ? '+ புதிய பண்ணை' : '+ Add Farm'}</ThemedText>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -2859,8 +2871,12 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
 
     sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginTop: 24, marginBottom: 12 },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginLeft: 8 },
+    sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1, flexShrink: 1, minWidth: 0 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginLeft: 8, flexShrink: 1 },
     addLink: { fontSize: 13, color: '#10b981', fontWeight: '600' },
+    addFarmButton: { backgroundColor: '#10b981', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, flexShrink: 0, alignSelf: 'center' },
+    addFarmButtonText: { fontSize: 14, color: '#ffffff', fontWeight: '700' },
+    farmCardEmpty: { marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', minHeight: 160 },
 
     farmCard: {
         marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#f1f5f9'
@@ -2905,6 +2921,8 @@ const styles = StyleSheet.create({
     farmLoc: { fontSize: 13, color: '#64748b' },
     farmAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
     farmAlert: { fontSize: 12, color: '#dc2626', fontWeight: '500' },
+    farmMenuDropdown: { position: 'absolute', right: 0, top: 28, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', paddingVertical: 4, minWidth: 140, elevation: 8, shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, zIndex: 100 },
+    farmMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
     outlineBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10,
         borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 8, backgroundColor: '#eff6ff', gap: 8
