@@ -10,12 +10,8 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// RemoteImage helper (local fallback)
-function RemoteImage({ uri, style, resizeMode }: { uri?: string; style?: any; resizeMode?: any }) {
-  const [failed, setFailed] = React.useState(false);
-  const src = !uri || failed ? require('../../assets/images/coconut-trees.png') : { uri };
-  return <Image source={src} style={style} resizeMode={resizeMode} onError={() => setFailed(true)} />;
-}
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
+import { RemoteImage } from '@/components/RemoteImage';
 
 export default function EventDetail() {
   const { language } = useLanguage();
@@ -172,7 +168,7 @@ export default function EventDetail() {
           style={styles.topAppBarLogo}
           resizeMode="contain"
         />
-        <View style={{ width: 36 }} />
+        <HeaderNotificationIcon />
       </View>
 
       {loading ? (

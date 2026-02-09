@@ -1,4 +1,5 @@
 import FarmerBottomNav from '@/components/farmer-bottom-nav';
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -11,34 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Small helper to render a remote image with a local fallback when it fails to load
-function RemoteImage({ uri, style, resizeMode }: { uri?: string; style?: any; resizeMode?: any }) {
-  const [failed, setFailed] = React.useState(false);
-
-  React.useEffect(() => {
-    // Reset failed state when URI changes
-    setFailed(false);
-  }, [uri]);
-
-  const cleanUri = uri?.trim();
-  const src = !cleanUri || failed ? require('../assets/images/coconut-trees.png') : { uri: cleanUri };
-
-  return (
-    <Image
-      source={src}
-      style={style}
-      resizeMode={resizeMode}
-      onError={(error) => {
-        console.log('RemoteImage load error:', cleanUri, error.nativeEvent.error);
-        setFailed(true);
-      }}
-      onLoad={() => {
-        console.log('RemoteImage loaded successfully:', cleanUri);
-        setFailed(false);
-      }}
-    />
-  );
-}
+import { RemoteImage } from '@/components/RemoteImage';
 
 export default function FarmerDashboard() {
   const { t, language } = useLanguage();
@@ -408,16 +382,18 @@ export default function FarmerDashboard() {
           style={styles.topAppBarLogo}
           resizeMode="contain"
         />
-        <View style={{ width: 36 }} />
+        <HeaderNotificationIcon />
       </View>
 
-      {/* Info strip */}
-      <View style={styles.infoStripRow}>
-        <ThemedText style={styles.infoStripText}>{language === 'ta' ? `உங்கள் சுயவிவரம் ${profileCompletion ?? 0}% முழுமையானது` : `Your profile is ${profileCompletion ?? 0}% complete`}</ThemedText>
-        <TouchableOpacity style={styles.infoStripAction} activeOpacity={0.8} onPress={() => router.push('/profile' as any)}>
-          <ThemedText style={styles.infoStripActionText}>{language === 'ta' ? 'முழுமையாக்கு' : 'Complete'}</ThemedText>
-        </TouchableOpacity>
-      </View>
+      {/* Info strip - hide when profile is 100% complete */}
+      {profileCompletion !== 100 && (
+        <View style={styles.infoStripRow}>
+          <ThemedText style={styles.infoStripText}>{language === 'ta' ? `உங்கள் சுயவிவரம் ${profileCompletion ?? 0}% முழுமையானது` : `Your profile is ${profileCompletion ?? 0}% complete`}</ThemedText>
+          <TouchableOpacity style={styles.infoStripAction} activeOpacity={0.8} onPress={() => router.push('/profile' as any)}>
+            <ThemedText style={styles.infoStripActionText}>{language === 'ta' ? 'முழுமையாக்கு' : 'Complete'}</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Price card */}

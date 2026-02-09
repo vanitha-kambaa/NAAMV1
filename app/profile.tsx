@@ -1,4 +1,6 @@
 import FarmerBottomNav from '@/components/farmer-bottom-nav';
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
+import { RemoteImage } from '@/components/RemoteImage';
 import { useSideMenu } from '@/components/SideMenu';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,17 +10,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -533,7 +535,7 @@ export default function Profile() {
           style={styles.topAppBarLogo}
           resizeMode="contain"
         />
-        <View style={{ width: 36 }} />
+        <HeaderNotificationIcon />
       </View>
 
       <View style={styles.container}>
@@ -545,7 +547,7 @@ export default function Profile() {
                 <View style={styles.headerRow}>
                   <View style={styles.avatarWrap}>
                     <View style={styles.avatar}>{avatarUri ? (
-                      <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                      <RemoteImage uri={avatarUri} style={styles.avatarImg} />
                     ) : (
                       <IconSymbol name="person.fill" size={36} color="#ffffff" />
                     )}</View>

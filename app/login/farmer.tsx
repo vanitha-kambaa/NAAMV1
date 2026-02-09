@@ -11,7 +11,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 export default function FarmerLogin() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-  const { t, language } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const isSmallScreen = screenWidth < 375;
 
@@ -97,6 +97,13 @@ export default function FarmerLogin() {
       const data = await response.json();
 
       if (response.ok && data?.status === 'success') {
+        // Set language from API preferred_language (data.data, data.data.farmer, or data.data.user)
+        const prefLang = data.data?.preferred_language ?? data.data?.farmer?.preferred_language ?? data.data?.user?.preferred_language ?? '';
+        const lang = String(prefLang).toLowerCase();
+        if (lang === 'en' || lang === 'english') setLanguage('en');
+        else if (lang === 'ta' || lang === 'tamil') setLanguage('ta');
+        // else keep current language (no change)
+
         // store token and user info
         if (data.data?.token) await AsyncStorage.setItem('authToken', data.data.token);
         let roleName = 'farmer';

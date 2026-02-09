@@ -4,6 +4,7 @@ import { API_CONFIG } from '@/config/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -113,7 +114,18 @@ export default function AdminScreen() {
   const [showCreateTargetOptions, setShowCreateTargetOptions] = useState<boolean>(false);
   const [showSourceDropdown, setShowSourceDropdown] = useState<boolean>(false);
   const [showNewsPreview, setShowNewsPreview] = useState<boolean>(false);
-
+  const [createNewsStatesList, setCreateNewsStatesList] = useState<any[]>([]);
+  const [createNewsSelectedStateId, setCreateNewsSelectedStateId] = useState<string | number | null>('all');
+  const [createNewsStartDate, setCreateNewsStartDate] = useState<string>('');
+  const [createNewsEndDate, setCreateNewsEndDate] = useState<string>('');
+  const [createNewsPlace, setCreateNewsPlace] = useState<string>('');
+  const [createNewsOrganizer, setCreateNewsOrganizer] = useState<string>('');
+  const [createNewsNews, setCreateNewsNews] = useState<string>('');
+  const [createNewsVerified, setCreateNewsVerified] = useState<boolean>(false);
+  const [showCreateNewsTypeDropdown, setShowCreateNewsTypeDropdown] = useState<boolean>(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState<boolean>(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState<boolean>(false);
+  const [createNewsSubmitting, setCreateNewsSubmitting] = useState<boolean>(false);
 
   // Create Event modal state
   const [createEventModalVisible, setCreateEventModalVisible] = useState<boolean>(false);
@@ -134,6 +146,12 @@ export default function AdminScreen() {
       fetchRoleOptions();
     }
   }, [loggedUser]);
+
+  useEffect(() => {
+    if (createNewsModalVisible && createNewsStatesList.length === 0) {
+      fetchCreateNewsStates();
+    }
+  }, [createNewsModalVisible]);
 
   const fetchRoleOptions = async () => {
     if (!loggedUser?.role_id) {
@@ -644,11 +662,60 @@ export default function AdminScreen() {
     return !!pattern.test(url);
   };
 
+  const fetchCreateNewsStates = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const res = await fetch(`${API_CONFIG.BASE_URL}/states/all`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json();
+      if (json?.status === 'success' && json?.data?.states) {
+        setCreateNewsStatesList(json.data.states);
+      } else if (json?.status === 'success' && json?.data) {
+        const states = json.data?.states ?? json.data;
+        if (Array.isArray(states)) setCreateNewsStatesList(states);
+      }
+    } catch (e) {
+      console.warn('fetchCreateNewsStates error', e);
+    }
+  };
+
   const isAdminRole = (loggedUser?.role_id === 21 || loggedUser?.role_id === 22);
+
+  const createNewsFormLang = (): 'en' | 'ta' => {
+    if (createNewsSelectedStateId === 'all' || createNewsSelectedStateId === null) return 'en';
+    const state = createNewsStatesList.find((s: any) => s.id === createNewsSelectedStateId);
+    if (!state) return 'en';
+    const name = String(state.state || '').toLowerCase();
+    const nameTa = String(state.statet_name || state.state_tamil || '').toLowerCase();
+    if (name.includes('tamil') || nameTa.includes('தமிழ்')) return 'ta';
+    return 'en';
+  };
+  const formLang = createNewsFormLang();
+
+  const formatDateDdMmYyyy = (d: Date) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+  const parseDdMmYyyyToDate = (s: string): Date => {
+    const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (m) return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+    return new Date();
+  };
+  const createNewsStartDateObj = createNewsStartDate ? parseDdMmYyyyToDate(createNewsStartDate) : new Date();
+  const createNewsEndDateObj = createNewsEndDate ? parseDdMmYyyyToDate(createNewsEndDate) : new Date();
 
   const canSubmit = createNewsTitle.trim().length > 0 && createNewsContent.trim().length > 0 && createNewsLocation.trim().length > 0 && createNewsLinks.trim().length > 0;
 
-  const handleCreateNewsSubmit = (approve: boolean = false) => {
+  const ddMmYyyyToYyyyMmDd = (s: string): string => {
+    const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
+
+  const handleCreateNewsSubmit = async (approve: boolean = false) => {
     if (!createNewsTitle.trim()) { setCreateNewsError(language === 'ta' ? 'தலைப்பு தேவை' : 'Title is required'); return; }
     if (!createNewsContent.trim()) { setCreateNewsError(language === 'ta' ? 'உள்ளடக்கம் தேவை' : 'Content is required'); return; }
     if (!createNewsLocation.trim()) { setCreateNewsError(language === 'ta' ? 'மூலம் தேவை' : 'Source is required'); return; }
@@ -656,27 +723,85 @@ export default function AdminScreen() {
     if (!validateLink(createNewsLinks.trim())) { setCreateNewsError(language === 'ta' ? 'சரியான இணைய முகவரியை உள்ளிடவும்' : 'Please enter a valid link URL'); return; }
 
     const shouldAutoApprove = isAdminRole || approve;
+    setCreateNewsSubmitting(true);
+    setCreateNewsError('');
 
-    const newItem = {
-      id: `n${Date.now()}`,
-      title: createNewsTitle,
-      // subtitle: createNewsSubtitle, // Removed
-      excerpt: createNewsContent.length > 140 ? createNewsContent.substring(0, 140) + '...' : createNewsContent,
-      content: createNewsContent,
-      location: createNewsLocation,
-      links: createNewsLinks,
-      image_uri: createNewsImage,
-      type: createNewsType,
-      status: shouldAutoApprove ? 'published' : 'pending',
-      target_level: createNewsTargetLevel,
-      date: new Date().toISOString().split('T')[0],
-      author: 'Admin',
-      factChecked: shouldAutoApprove, // Auto fact checked if admin approves
-    };
-    setNewsList(prev => [newItem, ...prev]);
-    setStats((prev: any) => ({ ...prev, news: (prev.news || 0) + 1, published: (prev.published || 0) + (shouldAutoApprove ? 1 : 0), pending: (prev.pending || 0) + (shouldAutoApprove ? 0 : 1) }));
-    setCreateNewsModalVisible(false);
-    Alert.alert(language === 'ta' ? 'செய்தி சேர்க்கப்பட்டது' : 'News added', language === 'ta' ? (shouldAutoApprove ? 'உங்கள் செய்தி வெளியிடப்பட்டது.' : 'உங்கள் செய்தி சேர்க்கப்பட்டது.') : (shouldAutoApprove ? 'Your news item has been published.' : 'Your news item has been added.'));
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const fd = new FormData();
+      fd.append('type', createNewsType === 'event' ? 'Events' : 'News');
+      fd.append('event_name', createNewsTitle.trim());
+      fd.append('event_name_tamil', '');
+      fd.append('description', createNewsContent.trim());
+      fd.append('description_tamil', '');
+      fd.append('location', (createNewsPlace || createNewsLocation || '').trim());
+      fd.append('location_tamil', '');
+      fd.append('organizer', (createNewsOrganizer || 'Admin').trim());
+      fd.append('organizer_tamil', '');
+      fd.append('fact_verified', createNewsVerified ? '1' : '0');
+      fd.append('read_moreurl', createNewsLinks.trim());
+      fd.append('news_for', (createNewsNews || '').trim());
+      fd.append('start_date', ddMmYyyyToYyyyMmDd(createNewsStartDate || ''));
+      fd.append('end_date', ddMmYyyyToYyyyMmDd(createNewsEndDate || ''));
+      fd.append('source', createNewsLocation.trim());
+      fd.append('target_type', createNewsTargetLevel === 'state' ? 'Specific State' : 'District');
+      fd.append('state', String(createNewsSelectedStateId === 'all' || createNewsSelectedStateId === null ? 0 : createNewsSelectedStateId));
+      fd.append('status', shouldAutoApprove ? '1' : '0');
+
+      if (createNewsImage) {
+        const uriParts = createNewsImage.split('.');
+        const fileType = (uriParts[uriParts.length - 1] || 'jpg').toLowerCase();
+        const mime = fileType === 'png' ? 'image/png' : fileType === 'webp' ? 'image/webp' : 'image/jpeg';
+        fd.append('image', { uri: createNewsImage, name: `image.${fileType}`, type: mime } as any);
+      }
+
+      const res = await fetch(`${API_CONFIG.BASE_URL}/upcoming-events`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: fd,
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (res.ok && (json?.status === 'success' || json?.data)) {
+        const created = json?.data || json;
+        const newItem = {
+          id: created?.id || `n${Date.now()}`,
+          title: createNewsTitle,
+          excerpt: createNewsContent.length > 140 ? createNewsContent.substring(0, 140) + '...' : createNewsContent,
+          content: createNewsContent,
+          location: createNewsPlace || createNewsLocation,
+          source: createNewsLocation,
+          links: createNewsLinks,
+          image_uri: createNewsImage,
+          type: createNewsType,
+          status: shouldAutoApprove ? 'published' : 'pending',
+          target_level: createNewsTargetLevel,
+          date: ddMmYyyyToYyyyMmDd(createNewsStartDate || ''),
+          author: createNewsOrganizer || 'Admin',
+          organizer: createNewsOrganizer,
+          news_for: createNewsNews,
+          start_date: createNewsStartDate,
+          end_date: createNewsEndDate,
+          state_id: createNewsSelectedStateId,
+        };
+        setNewsList(prev => [newItem, ...prev]);
+        setStats((prev: any) => ({ ...prev, news: (prev.news || 0) + 1, published: (prev.published || 0) + (shouldAutoApprove ? 1 : 0), pending: (prev.pending || 0) + (shouldAutoApprove ? 0 : 1) }));
+        setCreateNewsModalVisible(false);
+        setShowNewsPreview(false);
+        Alert.alert(language === 'ta' ? 'செய்தி சேர்க்கப்பட்டது' : 'News added', language === 'ta' ? (shouldAutoApprove ? 'உங்கள் செய்தி வெளியிடப்பட்டது.' : 'உங்கள் செய்தி சேர்க்கப்பட்டது.') : (shouldAutoApprove ? 'Your news item has been published.' : 'Your news item has been added.'));
+      } else {
+        setCreateNewsError(json?.message || json?.error || (language === 'ta' ? 'சேமிக்க முடியவில்லை' : 'Failed to save'));
+      }
+    } catch (e) {
+      console.warn('handleCreateNewsSubmit error', e);
+      setCreateNewsError(language === 'ta' ? 'சேமிக்க முடியவில்லை' : 'Failed to save');
+    } finally {
+      setCreateNewsSubmitting(false);
+    }
   };
 
   const handleCreateEventSubmit = async () => {
@@ -852,7 +977,7 @@ export default function AdminScreen() {
           style={styles.topAppBarLogo}
           resizeMode="contain"
         />
-        <View style={{ width: 36 }} />
+        <HeaderNotificationIcon />
       </View>
 
       {/* Header */}
@@ -1369,64 +1494,158 @@ export default function AdminScreen() {
                     <Pressable style={styles.modalContent} onPress={() => { }}>
                       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                         <View style={styles.modalHeader}>
-                          <ThemedText style={styles.modalTitle}>{showNewsPreview ? (language === 'ta' ? 'செய்தி முன்னோட்டம்' : 'News Preview') : (language === 'ta' ? 'புதிய செய்தி உருவாக்கு' : 'Create News')}</ThemedText>
+                          <ThemedText style={styles.modalTitle}>{showNewsPreview ? (formLang === 'ta' ? 'செய்தி முன்னோட்டம்' : 'News Preview') : (formLang === 'ta' ? 'புதிய செய்தி / நிகழ்வு உருவாக்கு' : 'Create New News / Event')}</ThemedText>
                           <TouchableOpacity onPress={() => { setCreateNewsModalVisible(false); setShowNewsPreview(false); }}><Ionicons name="close" size={18} color="#64748b" /></TouchableOpacity>
                         </View>
 
                         {showNewsPreview ? (
                           <View>
-                            <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'தலைப்பு' : 'Title'}</ThemedText>
+                            <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'தலைப்பு' : 'Title'}</ThemedText>
                             <ThemedText style={styles.previewTitle}>{createNewsTitle}</ThemedText>
 
                             {createNewsImage ? (
                               <>
-                                <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'படம்' : 'Image'}</ThemedText>
+                                <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'படம்' : 'Image'}</ThemedText>
                                 <Image source={{ uri: createNewsImage }} style={styles.previewImage} resizeMode="cover" />
                               </>
                             ) : null}
 
-                            <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'உள்ளடக்கம்' : 'Content'}</ThemedText>
+                            <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'உள்ளடக்கம்' : 'Content'}</ThemedText>
                             <ThemedText style={styles.previewContent}>{createNewsContent}</ThemedText>
 
                             <View style={styles.previewMetaContainer}>
                               <View style={styles.previewMetaItem}>
-                                <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'மூலம்' : 'Source'}</ThemedText>
+                                <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'மூலம்' : 'Source'}</ThemedText>
                                 <ThemedText style={styles.previewValue}>{createNewsLocation}</ThemedText>
                               </View>
                               <View style={styles.previewMetaItem}>
-                                <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'இலக்கு' : 'Target'}</ThemedText>
-                                <ThemedText style={styles.previewValue}>{createNewsTargetLevel === 'state' ? (language === 'ta' ? 'மாநிலம்' : 'State') : (language === 'ta' ? 'மாவட்டம்' : 'District')}</ThemedText>
+                                <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'இலக்கு' : 'Target'}</ThemedText>
+                                <ThemedText style={styles.previewValue}>{createNewsTargetLevel === 'state' ? (formLang === 'ta' ? 'மாநிலம்' : 'State') : (formLang === 'ta' ? 'மாவட்டம்' : 'District')}</ThemedText>
                               </View>
                             </View>
                             <View style={styles.previewMetaItem}>
-                              <ThemedText style={styles.previewLabel}>{language === 'ta' ? 'இணைப்பு' : 'Link'}</ThemedText>
+                              <ThemedText style={styles.previewLabel}>{formLang === 'ta' ? 'மேலும் படிக்க URL' : 'Read More URL'}</ThemedText>
                               <ThemedText style={styles.previewValue} selectable>{createNewsLinks}</ThemedText>
                             </View>
 
                             <View style={styles.modalFooter}>
-                              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowNewsPreview(false)}>
+                              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowNewsPreview(false)} disabled={createNewsSubmitting}>
                                 <ThemedText style={styles.cancelBtnText}>{language === 'ta' ? 'திருத்து' : 'Edit'}</ThemedText>
                               </TouchableOpacity>
-                              <TouchableOpacity style={styles.giveBtn} onPress={() => handleCreateNewsSubmit(true)}>
-                                <ThemedText style={styles.giveBtnText}>{language === 'ta' ? 'அங்கீகரித்து சமர்ப்பி' : 'Approve and Submit'}</ThemedText>
+                              <TouchableOpacity style={[styles.giveBtn, createNewsSubmitting && styles.giveBtnDisabled]} onPress={() => handleCreateNewsSubmit(true)} disabled={createNewsSubmitting}>
+                                {createNewsSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <ThemedText style={styles.giveBtnText}>{formLang === 'ta' ? 'வெளியிடு' : 'Publish'}</ThemedText>}
                               </TouchableOpacity>
                             </View>
                           </View>
                         ) : (
                           <>
-                            <ThemedText style={{ color: '#64748b', fontSize: 10 }}>{language === 'ta' ? 'உங்கள் அதிகாரப் பகுதிக்கான உள்ளடக்கத்தை உருவாக்கவும். இது மேல் தலைவர் அனுமதிக்குப் பிறகு வெளியிடப்படும்.' : 'Create content for your jurisdiction. It will be published after approval from your superior leader.'}</ThemedText>
+                            <ThemedText style={[styles.fieldLabel, { marginBottom: 8 }]}>{formLang === 'ta' ? 'மாநிலம் தேர்ந்தெடுக்கவும்' : 'Select State'}</ThemedText>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setCreateNewsSelectedStateId('all')}>
+                                <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: createNewsSelectedStateId === 'all' ? '#2563eb' : '#cbd5e1', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                                  {createNewsSelectedStateId === 'all' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#2563eb' }} />}
+                                </View>
+                                <ThemedText>{formLang === 'ta' ? 'அனைத்து மாநிலங்கள்' : 'All States'}</ThemedText>
+                              </TouchableOpacity>
+                              {createNewsStatesList.map((s: any) => (
+                                <TouchableOpacity key={s.id} style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setCreateNewsSelectedStateId(s.id)}>
+                                  <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: createNewsSelectedStateId === s.id ? '#2563eb' : '#cbd5e1', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                                    {createNewsSelectedStateId === s.id && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#2563eb' }} />}
+                                  </View>
+                                  <ThemedText>{formLang === 'ta' ? (s.statet_name || s.state) : (s.state || s.statet_name)}</ThemedText>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
 
-                            <ThemedText style={styles.fieldLabel}>{language === 'ta' ? 'தலைப்பு *' : 'Title *'}</ThemedText>
-                            <TextInput style={styles.modalInput} value={createNewsTitle} onChangeText={setCreateNewsTitle} placeholder={language === 'ta' ? 'செய்தி தலைப்பு' : 'Enter title'} placeholderTextColor="#94a3b8" />
+                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                              <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.fieldLabel}>{formLang === 'ta' ? 'வகை' : 'Type'}</ThemedText>
+                                <TouchableOpacity style={styles.selectBox} onPress={() => setShowCreateNewsTypeDropdown(!showCreateNewsTypeDropdown)}>
+                                  <ThemedText>{createNewsType === 'event' ? (formLang === 'ta' ? 'நிகழ்வுகள்' : 'Events') : (formLang === 'ta' ? 'செய்திகள்' : 'News')}</ThemedText>
+                                  <Ionicons name="chevron-down" size={16} color="#64748b" />
+                                </TouchableOpacity>
+                                {showCreateNewsTypeDropdown && (
+                                  <View style={styles.selectOptions}>
+                                    <TouchableOpacity style={styles.selectOption} onPress={() => { setCreateNewsType('news'); setShowCreateNewsTypeDropdown(false); }}>
+                                      <ThemedText>{formLang === 'ta' ? 'செய்திகள்' : 'News'}</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.selectOption} onPress={() => { setCreateNewsType('event'); setShowCreateNewsTypeDropdown(false); }}>
+                                      <ThemedText>{formLang === 'ta' ? 'நிகழ்வுகள்' : 'Events'}</ThemedText>
+                                    </TouchableOpacity>
+                                  </View>
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.fieldLabel}>{formLang === 'ta' ? 'தொடக்க தேதி' : 'Start Date'}</ThemedText>
+                                <TouchableOpacity style={styles.inputWithIcon} onPress={() => setShowStartDatePicker(true)}>
+                                  <ThemedText style={[styles.dateInputInner, { color: createNewsStartDate ? '#0f172a' : '#94a3b8' }]}>{createNewsStartDate || 'dd-mm-yyyy'}</ThemedText>
+                                  <Ionicons name="calendar-outline" size={18} color="#64748b" style={{ marginLeft: 10 }} />
+                                </TouchableOpacity>
+                                {showStartDatePicker && (
+                                  <DateTimePicker
+                                    value={createNewsStartDateObj}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={(e, d) => {
+                                      if (Platform.OS === 'android' && (e as any).type === 'dismissed') setShowStartDatePicker(false);
+                                      else setShowStartDatePicker(Platform.OS === 'ios');
+                                      if (d) setCreateNewsStartDate(formatDateDdMmYyyy(d));
+                                    }}
+                                  />
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.fieldLabel}>{formLang === 'ta' ? 'முடிவு தேதி' : 'End Date'}</ThemedText>
+                                <TouchableOpacity style={styles.inputWithIcon} onPress={() => setShowEndDatePicker(true)}>
+                                  <ThemedText style={[styles.dateInputInner, { color: createNewsEndDate ? '#0f172a' : '#94a3b8' }]}>{createNewsEndDate || 'dd-mm-yyyy'}</ThemedText>
+                                  <Ionicons name="calendar-outline" size={18} color="#64748b" style={{ marginLeft: 10 }} />
+                                </TouchableOpacity>
+                                {showEndDatePicker && (
+                                  <DateTimePicker
+                                    value={createNewsEndDateObj}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={(e, d) => {
+                                      if (Platform.OS === 'android' && (e as any).type === 'dismissed') setShowEndDatePicker(false);
+                                      else setShowEndDatePicker(Platform.OS === 'ios');
+                                      if (d) setCreateNewsEndDate(formatDateDdMmYyyy(d));
+                                    }}
+                                  />
+                                )}
+                              </View>
+                            </View>
 
-                            {/* Subtitle removed */}
+                            <ThemedText style={styles.fieldLabel}>{formLang === 'ta' ? 'தலைப்பு *' : 'Title *'}</ThemedText>
+                            <TextInput style={styles.modalInput} value={createNewsTitle} onChangeText={setCreateNewsTitle} placeholder={formLang === 'ta' ? 'தமிழ்' : 'Enter title'} placeholderTextColor="#94a3b8" />
 
-                            <ThemedText style={styles.fieldLabel}>{language === 'ta' ? 'உள்ளடக்கம் *' : 'Content *'}</ThemedText>
-                            <TextInput style={styles.modalTextarea} value={createNewsContent} onChangeText={setCreateNewsContent} placeholder={language === 'ta' ? 'முழு செய்தி உள்ளடக்கம்' : 'Content'} placeholderTextColor="#94a3b8" multiline />
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'இடம் *' : 'Location *'}</ThemedText>
+                            <TextInput style={styles.modalInput} value={createNewsPlace} onChangeText={setCreateNewsPlace} placeholder={formLang === 'ta' ? 'தமிழ்' : 'Enter location'} placeholderTextColor="#94a3b8" />
 
-                            <ThemedText style={styles.fieldLabel}>{language === 'ta' ? 'மூலம் *' : 'Source *'}</ThemedText>
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'விளக்கம் *' : 'Description *'}</ThemedText>
+                            <TextInput style={styles.modalTextarea} value={createNewsContent} onChangeText={setCreateNewsContent} placeholder={formLang === 'ta' ? 'தமிழ்' : 'Enter description'} placeholderTextColor="#94a3b8" multiline />
+
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'ஏற்பாட்டாளர் *' : 'Organizer *'}</ThemedText>
+                            <TextInput style={styles.modalInput} value={createNewsOrganizer} onChangeText={setCreateNewsOrganizer} placeholder={formLang === 'ta' ? 'தமிழ்' : 'Enter organizer'} placeholderTextColor="#94a3b8" />
+
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'இலக்கு வகை' : 'Target Type'}</ThemedText>
+                            <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
+                              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setCreateNewsTargetLevel('state')}>
+                                <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: createNewsTargetLevel === 'state' ? '#2563eb' : '#cbd5e1', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                                  {createNewsTargetLevel === 'state' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#2563eb' }} />}
+                                </View>
+                                <ThemedText>{formLang === 'ta' ? 'மாநிலம்' : 'State'}</ThemedText>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setCreateNewsTargetLevel('district')}>
+                                <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: createNewsTargetLevel === 'district' ? '#2563eb' : '#cbd5e1', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                                  {createNewsTargetLevel === 'district' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#2563eb' }} />}
+                                </View>
+                                <ThemedText>{formLang === 'ta' ? 'மாவட்டம்' : 'District'}</ThemedText>
+                              </TouchableOpacity>
+                            </View>
+
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'மூலம்' : 'Source'}</ThemedText>
                             <TouchableOpacity style={styles.selectBox} onPress={() => setShowSourceDropdown(!showSourceDropdown)}>
-                              <ThemedText style={{ color: createNewsLocation ? '#0f172a' : '#94a3b8' }}>{createNewsLocation || (language === 'ta' ? 'மூலத்தை தேர்வு செய்க' : 'Select Source')}</ThemedText>
+                              <ThemedText style={{ color: createNewsLocation ? '#0f172a' : '#94a3b8' }}>{createNewsLocation || (formLang === 'ta' ? 'மூலத்தை தேர்வு செய்க' : 'Select source')}</ThemedText>
                               <Ionicons name="chevron-down" size={16} color="#64748b" />
                             </TouchableOpacity>
                             {showSourceDropdown && (
@@ -1439,75 +1658,64 @@ export default function AdminScreen() {
                               </View>
                             )}
 
-                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{language === 'ta' ? 'இணைப்பு *' : 'Link *'}</ThemedText>
-                            <TextInput style={styles.modalInput} value={createNewsLinks} onChangeText={setCreateNewsLinks} placeholder="https://example.com" placeholderTextColor="#94a3b8" autoCapitalize="none" keyboardType="url" />
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'செய்திக்கான / தலைப்பு' : 'News For / Tagline'}</ThemedText>
+                            <TextInput style={styles.modalInput} value={createNewsNews} onChangeText={setCreateNewsNews} placeholder={formLang === 'ta' ? 'உதா: சிறு விவசாயிகளுக்கு' : 'e.g. For Small Farmers'} placeholderTextColor="#94a3b8" />
 
-                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{language === 'ta' ? 'படம்' : 'Image'}</ThemedText>
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{formLang === 'ta' ? 'மேலும் படிக்க URL' : 'Read More URL'}</ThemedText>
+                            <View style={styles.inputWithIcon}>
+                              <TextInput style={styles.dateInputInner} value={createNewsLinks} onChangeText={setCreateNewsLinks} placeholder="https://example.com/more-info" placeholderTextColor="#94a3b8" autoCapitalize="none" keyboardType="url" />
+                              <Ionicons name="link" size={18} color="#64748b" style={{ marginLeft: 10 }} />
+                            </View>
+
+                            <View style={[styles.checkboxRow, { marginTop: 12 }]}>
+                              <TouchableOpacity onPress={() => setCreateNewsVerified(!createNewsVerified)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: '#e6eef3', alignItems: 'center', justifyContent: 'center', backgroundColor: createNewsVerified ? '#065f46' : '#fff' }}>
+                                  {createNewsVerified && <Ionicons name="checkmark" size={14} color="#fff" />}
+                                </View>
+                                <ThemedText style={[styles.checkboxLabel, { marginLeft: 8 }]}>{formLang === 'ta' ? 'உண்மை சரிபார்க்கப்பட்டது' : 'Verified True'}</ThemedText>
+                              </TouchableOpacity>
+                            </View>
+
+                            <ThemedText style={[styles.fieldLabel, { marginTop: 16 }]}>{formLang === 'ta' ? 'படம்' : 'Image'}</ThemedText>
                             <TouchableOpacity style={styles.imageUploadBtn} onPress={pickNewsImage}>
                               {createNewsImage ? (
                                 <Image source={{ uri: createNewsImage }} style={{ width: '100%', height: 150, borderRadius: 8 }} resizeMode="cover" />
                               ) : (
-                                <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                                  <Ionicons name="image-outline" size={32} color="#64748b" />
-                                  <ThemedText style={{ color: '#64748b', marginTop: 8 }}>{language === 'ta' ? 'படம் பதிவேற்றவும்' : 'Upload Image'}</ThemedText>
+                                <View style={{ alignItems: 'center', justifyContent: 'center', padding: 24, borderWidth: 1, borderStyle: 'dashed', borderColor: '#d1d5db', borderRadius: 8 }}>
+                                  <Ionicons name="cloud-upload-outline" size={36} color="#64748b" />
+                                  <ThemedText style={{ color: '#64748b', marginTop: 8 }}>{formLang === 'ta' ? 'பதிவேற்ற கிளிக் செய்யவும்' : 'Click to upload'}</ThemedText>
+                                  <ThemedText style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>PNG, JPG or WebP (Max 2MB)</ThemedText>
                                 </View>
                               )}
                             </TouchableOpacity>
                             {createNewsImage ? (
                               <TouchableOpacity onPress={() => setCreateNewsImage('')} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
-                                <ThemedText style={{ color: '#ef4444', fontSize: 12 }}>{language === 'ta' ? 'படத்தை நீக்கு' : 'Remove Image'}</ThemedText>
+                                <ThemedText style={{ color: '#ef4444', fontSize: 12 }}>{formLang === 'ta' ? 'படத்தை நீக்கு' : 'Remove Image'}</ThemedText>
                               </TouchableOpacity>
                             ) : null}
 
-
-                            <ThemedText style={[styles.fieldLabel, { marginTop: 12 }]}>{language === 'ta' ? 'இலக்கு நிலை' : 'Target Level'}</ThemedText>
-                            <TouchableOpacity style={styles.selectBox} onPress={() => setShowCreateTargetOptions(!showCreateTargetOptions)}>
-                              <ThemedText>{language === 'ta' ? (createNewsTargetLevel === 'state' ? 'மாநிலம்' : 'மாவட்டம்') : (createNewsTargetLevel === 'state' ? 'State' : 'District')}</ThemedText>
-                              <Ionicons name="chevron-down" size={16} color="#64748b" />
-                            </TouchableOpacity>
-                            {showCreateTargetOptions && (
-                              <View style={styles.selectOptions}>
-                                <TouchableOpacity style={styles.selectOption} onPress={() => { setCreateNewsTargetLevel('state'); setShowCreateTargetOptions(false); }}>
-                                  <ThemedText>{language === 'ta' ? 'மாநிலம்' : 'State'}</ThemedText>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.selectOption} onPress={() => { setCreateNewsTargetLevel('district'); setShowCreateTargetOptions(false); }}>
-                                  <ThemedText>{language === 'ta' ? 'மாவட்டம்' : 'District'}</ThemedText>
-                                </TouchableOpacity>
-                              </View>
-                            )}
-
-                            {!isAdminRole && (
-                              <View style={styles.checkboxRow}>
-                                <TouchableOpacity onPress={() => setCreateNewsPublishNow(!createNewsPublishNow)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                  <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: '#e6eef3', alignItems: 'center', justifyContent: 'center', backgroundColor: createNewsPublishNow ? '#065f46' : '#fff' }}>
-                                    {createNewsPublishNow && <Ionicons name="checkmark" size={14} color="#fff" />}
-                                  </View>
-                                  <ThemedText style={styles.checkboxLabel}>{language === 'ta' ? 'உண்மை சரிபார்ப்பு செய்யப்பட்டது' : 'Fact Checked'}</ThemedText>
-                                </TouchableOpacity>
-                              </View>
-                            )}
-
                             {createNewsError ? <ThemedText style={styles.errorText}>{createNewsError}</ThemedText> : null}
 
-                            <View style={styles.modalFooter}>
-                              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setCreateNewsModalVisible(false); setShowNewsPreview(false); }}><ThemedText style={styles.cancelBtnText}>{language === 'ta' ? 'ரத்து' : 'Cancel'}</ThemedText></TouchableOpacity>
+                            <View style={[styles.modalFooter, { marginTop: 20 }]}>
+                              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setCreateNewsModalVisible(false); setShowNewsPreview(false); }}><ThemedText style={styles.cancelBtnText}>{formLang === 'ta' ? 'ரத்து' : 'Cancel'}</ThemedText></TouchableOpacity>
 
                               {isAdminRole ? (
-                                <TouchableOpacity style={[styles.giveBtn, !canSubmit && styles.giveBtnDisabled]} disabled={!canSubmit} onPress={() => {
-                                  if (!createNewsTitle.trim()) { setCreateNewsError(language === 'ta' ? 'தலைப்பு தேவை' : 'Title is required'); return; }
-                                  if (!createNewsContent.trim()) { setCreateNewsError(language === 'ta' ? 'உள்ளடக்கம் தேவை' : 'Content is required'); return; }
-                                  if (!createNewsLocation.trim()) { setCreateNewsError(language === 'ta' ? 'மூலம் தேவை' : 'Source is required'); return; }
-                                  if (!createNewsLinks.trim()) { setCreateNewsError(language === 'ta' ? 'இணைப்புகள் தேவை' : 'Links are required'); return; }
-                                  if (!validateLink(createNewsLinks.trim())) { setCreateNewsError(language === 'ta' ? 'சரியான இணைய முகவரியை உள்ளிடவும்' : 'Please enter a valid link URL'); return; }
+                                <TouchableOpacity style={[styles.giveBtn, (!canSubmit || createNewsSubmitting) && styles.giveBtnDisabled]} disabled={!canSubmit || createNewsSubmitting} onPress={() => {
+                                  if (!createNewsTitle.trim()) { setCreateNewsError(formLang === 'ta' ? 'தலைப்பு தேவை' : 'Title is required'); return; }
+                                  if (!createNewsContent.trim()) { setCreateNewsError(formLang === 'ta' ? 'உள்ளடக்கம் தேவை' : 'Content is required'); return; }
+                                  if (!createNewsLocation.trim()) { setCreateNewsError(formLang === 'ta' ? 'மூலம் தேவை' : 'Source is required'); return; }
+                                  if (!createNewsLinks.trim()) { setCreateNewsError(formLang === 'ta' ? 'இணைப்புகள் தேவை' : 'Links are required'); return; }
+                                  if (!validateLink(createNewsLinks.trim())) { setCreateNewsError(formLang === 'ta' ? 'சரியான இணைய முகவரியை உள்ளிடவும்' : 'Please enter a valid link URL'); return; }
                                   setCreateNewsError('');
                                   setShowNewsPreview(true);
                                 }}>
-                                  <ThemedText style={styles.giveBtnText}>{language === 'ta' ? 'முன்னோட்டம்' : 'Preview'}</ThemedText>
+                                  <ThemedText style={styles.giveBtnText}>{formLang === 'ta' ? 'முன்னோட்டம்' : 'Preview'}</ThemedText>
                                 </TouchableOpacity>
                               ) : (
-                                <TouchableOpacity style={[styles.giveBtn, !canSubmit && styles.giveBtnDisabled]} disabled={!canSubmit} onPress={() => handleCreateNewsSubmit(false)}><ThemedText style={styles.giveBtnText}>{language === 'ta' ? 'அமர்ந்து அனுப்பு' : 'Submit for Approval'}</ThemedText></TouchableOpacity>
+                                <TouchableOpacity style={[styles.giveBtn, (!canSubmit || createNewsSubmitting) && styles.giveBtnDisabled]} disabled={!canSubmit || createNewsSubmitting} onPress={() => handleCreateNewsSubmit(false)}>
+                                  {createNewsSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <ThemedText style={styles.giveBtnText}>{formLang === 'ta' ? 'சேமிக்கவும்' : 'Save'}</ThemedText>}
+                                </TouchableOpacity>
                               )}
-
                             </View>
                           </>
                         )}
@@ -1578,14 +1786,9 @@ export default function AdminScreen() {
                   <ThemedText style={{ fontSize: 18, fontWeight: '700' }}>{language === 'ta' ? 'செய்திகள் & நிகழ்வுகள்' : 'News & Events'}</ThemedText>
 
                   <View style={{ flexDirection: 'row', marginTop: 8, justifyContent: 'flex-end' }}>
-                    <TouchableOpacity style={styles.ctaOutline} onPress={() => { setCreateNewsModalVisible(true); setCreateNewsType('news'); setCreateNewsTitle(''); setCreateNewsContent(''); setCreateNewsLocation(''); setCreateNewsLinks(''); setCreateNewsImage(''); setCreateNewsPublishNow(false); setCreateNewsError(''); setCreateNewsTargetLevel('state'); setShowCreateTargetOptions(false); setShowNewsPreview(false); }}>
-                      <Ionicons name="add" size={14} color="#1e40af" />
-
-                      <ThemedText style={{ color: '#1e40af', marginLeft: 8 }}>{language === 'ta' ? 'செய்தி உருவாக்கு' : 'Create News'}</ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.ctaPrimary} onPress={() => { setCreateEventModalVisible(true); setCreateEventTitle(''); setCreateEventDesc(''); setCreateEventDate(''); setCreateEventLocation(''); setCreateEventError(''); }}>
-                      <Ionicons name="calendar" size={14} color="#fff" />
-                      <ThemedText style={{ color: '#fff', marginLeft: 8 }}>{language === 'ta' ? 'நிகழ்வு உருவாக்கு' : 'Create Event'}</ThemedText>
+                    <TouchableOpacity style={styles.ctaPrimary} onPress={() => { setCreateNewsModalVisible(true); setCreateNewsType('news'); setCreateNewsTitle(''); setCreateNewsContent(''); setCreateNewsLocation(''); setCreateNewsLinks(''); setCreateNewsImage(''); setCreateNewsPlace(''); setCreateNewsOrganizer(''); setCreateNewsNews(''); setCreateNewsStartDate(''); setCreateNewsEndDate(''); setCreateNewsVerified(false); setCreateNewsPublishNow(false); setCreateNewsError(''); setCreateNewsSelectedStateId('all'); setCreateNewsTargetLevel('state'); setShowCreateTargetOptions(false); setShowCreateNewsTypeDropdown(false); setShowStartDatePicker(false); setShowEndDatePicker(false); setShowNewsPreview(false); setCreateNewsSubmitting(false); }}>
+                      <Ionicons name="add" size={14} color="#fff" />
+                      <ThemedText style={{ color: '#fff', marginLeft: 8 }}>{language === 'ta' ? 'செய்தி & நிகழ்வு உருவாக்கு' : 'Create News & Event'}</ThemedText>
                     </TouchableOpacity>
                   </View>
                 </View>

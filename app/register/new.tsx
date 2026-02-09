@@ -81,9 +81,11 @@ export default function NewRegistration() {
 
   const [registering, setRegistering] = useState(false);
 
-  // Fee related states
-  const [feeData, setFeeData] = useState<{ reg_fees_enable: number; reg_fees: number } | null>(null);
+  // Fee related states (from /api/fees - data.feetype)
+  const [feeTypes, setFeeTypes] = useState<{ id: number; type: string; reg_fees: string; reg_fees_enable: number; status: string }[]>([]);
+  const [selectedFeeType, setSelectedFeeType] = useState<{ id: number; type: string; reg_fees: string; reg_fees_enable: number; status: string } | null>(null);
   const [feeLoading, setFeeLoading] = useState(false);
+  const [showFeeTypeStep, setShowFeeTypeStep] = useState(false);
   const [showFeeConfirmModal, setShowFeeConfirmModal] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
@@ -327,7 +329,7 @@ export default function NewRegistration() {
     }
   };
 
-  // Fetch registration fee settings
+  // Fetch registration fee types from /api/fees (data.feetype)
   const fetchFeeSettings = async () => {
     try {
       setFeeLoading(true);
@@ -339,27 +341,24 @@ export default function NewRegistration() {
       });
       const json = await res.json();
       console.log('Fee settings response:', json);
-      
-      if (json?.status === 'success' && json?.data?.fees && Array.isArray(json.data.fees) && json.data.fees.length > 0) {
-        // Extract fee data from the first fee object in the fees array
-        const feeInfo = json.data.fees[0];
-        const feeData = {
-          reg_fees_enable: feeInfo.reg_fees_enable || 0,
-          reg_fees: parseFloat(feeInfo.reg_fees || '0'), // Convert string to number
-        };
-        setFeeData(feeData);
-        return feeData;
+
+      if (json?.status === 'success' && json?.data?.feetype && Array.isArray(json.data.feetype) && json.data.feetype.length > 0) {
+        const types = json.data.feetype.map((f: any) => ({
+          id: f.id ?? 0,
+          type: String(f.type ?? ''),
+          reg_fees: String(f.reg_fees ?? '0'),
+          reg_fees_enable: Number(f.reg_fees_enable ?? 0),
+          status: String(f.status ?? ''),
+        }));
+        setFeeTypes(types);
+        return types;
       }
-      // Default to no fee if response structure is unexpected
-      const defaultFeeData = { reg_fees_enable: 0, reg_fees: 0 };
-      setFeeData(defaultFeeData);
-      return defaultFeeData;
+      setFeeTypes([]);
+      return [];
     } catch (e) {
       console.warn('fetchFeeSettings error', e);
-      // On error, default to no fee
-      const defaultFeeData = { reg_fees_enable: 0, reg_fees: 0 };
-      setFeeData(defaultFeeData);
-      return defaultFeeData;
+      setFeeTypes([]);
+      return [];
     } finally {
       setFeeLoading(false);
     }
@@ -386,14 +385,15 @@ export default function NewRegistration() {
     }
   };
 
-  // Handle complete button click - check fee settings first
+  // Handle complete button click - check selected type's reg_fees_enable
   const handleCompleteClick = async () => {
+    if (!selectedFeeType) {
+      Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'சேர விரும்பும் வகையை தேர்ந்தெடுக்கவும்' : 'Please select how you would like to join');
+      return;
+    }
     try {
-      setFeeLoading(true);
-      const fees = await fetchFeeSettings();
-      
-      if (fees && fees.reg_fees_enable === 1 && fees.reg_fees > 0) {
-        // Show fee confirmation modal
+      if (selectedFeeType.reg_fees_enable === 1 && parseFloat(selectedFeeType.reg_fees || '0') > 0) {
+        // Show fee confirmation modal, then Razorpay
         setShowFeeConfirmModal(true);
       } else {
         // No fee required, directly register and navigate
@@ -404,13 +404,10 @@ export default function NewRegistration() {
       }
     } catch (e) {
       console.warn('handleCompleteClick error', e);
-      // If fee check fails, try to register anyway
       const userId = await registerUser();
       if (userId) {
         await navigateAfterRegistration(userId);
       }
-    } finally {
-      setFeeLoading(false);
     }
   };
 
@@ -497,7 +494,7 @@ export default function NewRegistration() {
         return;
       }
 
-      const amountInPaise = (feeData?.reg_fees || 0) * 100; // Razorpay expects amount in paise
+      const amountInPaise = parseFloat(selectedFeeType?.reg_fees || '0') * 100; // Razorpay expects amount in paise
 
       const options = {
         description: language === 'ta' ? 'NAAM பதிவு கட்டணம்' : 'NAAM Registration Fee',
@@ -535,7 +532,7 @@ export default function NewRegistration() {
           userId,
           paymentId,
           paymentStatus: 1,
-          amount: feeData?.reg_fees || 0
+          amount: parseFloat(selectedFeeType?.reg_fees || '0')
         });
         
         // Update payment status with success
@@ -544,7 +541,7 @@ export default function NewRegistration() {
             userId,
             paymentId,
             1, // payment_status: 1 for success
-            feeData?.reg_fees || 0
+            parseFloat(selectedFeeType?.reg_fees || '0')
           );
           
           if (paymentUpdateSuccess) {
@@ -598,7 +595,7 @@ export default function NewRegistration() {
             userId,
             paymentId,
             paymentStatus: 0,
-            amount: feeData?.reg_fees || 0,
+            amount: parseFloat(selectedFeeType?.reg_fees || '0'),
             failureReason
           });
           
@@ -608,7 +605,7 @@ export default function NewRegistration() {
               userId,
               paymentId,
               0, // payment_status: 0 for failure
-              feeData?.reg_fees || 0,
+              parseFloat(selectedFeeType?.reg_fees || '0'),
               failureReason
             );
             
@@ -661,6 +658,7 @@ export default function NewRegistration() {
       fd.append('fullname', fullName);
       fd.append('mobile_no', mobile);
       fd.append('preferred_language', selectedLanguage);
+      fd.append('user_type', selectedFeeType?.type ?? '');
       fd.append('pincode', pincode);
       fd.append('state', selectedStateId ? String(selectedStateId) : '');
       fd.append('district', selectedDistrictId ? String(selectedDistrictId) : '');
@@ -787,7 +785,11 @@ export default function NewRegistration() {
 
   useEffect(() => {
     if (showManual && statesList.length === 0) fetchStates();
-  }, [showManual]); 
+  }, [showManual]);
+
+  useEffect(() => {
+    if (showFeeTypeStep && feeTypes.length === 0) fetchFeeSettings();
+  }, [showFeeTypeStep]); 
 
   return (
     <>
@@ -800,7 +802,8 @@ export default function NewRegistration() {
       >
         <View style={styles.topRow}>
           <TouchableOpacity style={styles.back} onPress={() => {
-            if (showFarm) { setShowFarm(false); setShowAadhar(true); }
+            if (showFeeTypeStep) { setShowFeeTypeStep(false); setShowFarm(true); setSelectedFeeType(null); }
+            else if (showFarm) { setShowFarm(false); setShowAadhar(true); }
             else if (showAadhar) { setShowAadhar(false); setShowPhotoUpload(true); }
             else if (showPhotoUpload) { setShowPhotoUpload(false); setShowWelcome(true); }
             else if (showWelcome) { setShowWelcome(false); }
@@ -1013,6 +1016,47 @@ export default function NewRegistration() {
               </TouchableOpacity>
             </View>
           </View>
+        ) : showFeeTypeStep ? (
+          <View style={[styles.card, { marginTop: 18, maxWidth: 760, alignSelf: 'center' }]}>
+            <ThemedText style={[styles.title, { fontSize: 24, marginBottom: 12 }]}>{language === 'ta' ? 'நீங்கள் எவ்வாறு சேர விரும்புகிறீர்கள்?' : 'Would you like to join as'}</ThemedText>
+
+            {feeLoading ? (
+              <ThemedText style={{ marginTop: 16, color: '#6b7280', textAlign: 'center' }}>{language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}</ThemedText>
+            ) : (
+              <View style={{ marginTop: 16 }}>
+                {feeTypes.map((ft) => (
+                  <TouchableOpacity
+                    key={ft.id}
+                    style={[
+                      styles.feeTypeOption,
+                      selectedFeeType?.id === ft.id && styles.feeTypeOptionSelected,
+                    ]}
+                    onPress={() => setSelectedFeeType(ft)}
+                  >
+                    <ThemedText style={[styles.feeTypeOptionText, selectedFeeType?.id === ft.id && styles.feeTypeOptionTextSelected]}>
+                      {ft.type.charAt(0).toUpperCase() + ft.type.slice(1)}
+                      {ft.reg_fees_enable === 1 && parseFloat(ft.reg_fees || '0') > 0 ? ` - ₹${ft.reg_fees}` : ` (${language === 'ta' ? 'இலவசம்' : 'Free'})`}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', marginTop: 24 }}>
+              <TouchableOpacity style={[styles.backBtn, { marginRight: 12 }]} onPress={() => { setShowFeeTypeStep(false); setShowFarm(true); setSelectedFeeType(null); }}>
+                <ThemedText style={{ color: '#374151' }}>{language === 'ta' ? 'பின்செல்' : 'Back'}</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.finishBtn} onPress={() => { handleCompleteClick(); }} disabled={registering || feeLoading || paymentProcessing || !selectedFeeType}>
+                <ThemedText style={styles.ctaText}>
+                  {feeLoading ? (language === 'ta' ? 'சரிபார்க்கிறது...' : 'Checking...') :
+                   paymentProcessing ? (language === 'ta' ? 'செயலாக்கம்...' : 'Processing...') :
+                   registering ? (language === 'ta' ? 'சேமிக்கிறது' : 'Registering...') :
+                   (language === 'ta' ? 'தொடரவும்' : 'Continue')}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : showFarm ? (
           <View style={[styles.card, { marginTop: 18, maxWidth: 760, alignSelf: 'center' }]}>
             <ThemedText style={[styles.title, { fontSize: 24, marginBottom: 12 }]}>{language === 'ta' ? 'பண்ணை அமைப்பு' : 'Farm Setup'}</ThemedText>
@@ -1027,11 +1071,11 @@ export default function NewRegistration() {
                 <ThemedText style={{ color: '#374151' }}>{language === 'ta' ? 'தவிர்க்கவும்' : 'Skip for Now'}</ThemedText>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.finishBtn} onPress={() => { handleCompleteClick(); }} disabled={registering || feeLoading || paymentProcessing}>
+              <TouchableOpacity style={styles.finishBtn} onPress={() => { setShowFarm(false); setShowFeeTypeStep(true); }} disabled={registering || feeLoading || paymentProcessing}>
                 <ThemedText style={styles.ctaText}>
-                  {feeLoading ? (language === 'ta' ? 'சரிபார்க்கிறது...' : 'Checking...') : 
+                  {feeLoading ? (language === 'ta' ? 'சரிபார்க்கிறது...' : 'Checking...') :
                    paymentProcessing ? (language === 'ta' ? 'செயலாக்கம்...' : 'Processing...') :
-                   registering ? (language === 'ta' ? 'சேமிக்கிறது' : 'Registering...') : 
+                   registering ? (language === 'ta' ? 'சேமிக்கிறது' : 'Registering...') :
                    (language === 'ta' ? 'முடிக்கவும்' : 'Complete')}
                 </ThemedText>
               </TouchableOpacity>
@@ -1405,7 +1449,7 @@ export default function NewRegistration() {
                 {language === 'ta' ? 'செலுத்த வேண்டிய தொகை' : 'Amount to Pay'}
               </ThemedText>
               <ThemedText style={styles.feeAmountValue}>
-                ₹{feeData?.reg_fees || 0}
+                ₹{selectedFeeType?.reg_fees || 0}
               </ThemedText>
             </View>
 
@@ -1471,6 +1515,10 @@ const styles = StyleSheet.create({
   locationBtn: { marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e6e6e6', paddingVertical: 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff' },
   locationInner: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   locationText: { marginLeft: 8, fontSize: 16, color: '#153f31' },
+  feeTypeOption: { marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e6e6e6', paddingVertical: 16, paddingHorizontal: 16, backgroundColor: '#fff' },
+  feeTypeOptionSelected: { borderColor: '#0bb24c', backgroundColor: '#ecfdf5', borderWidth: 2 },
+  feeTypeOptionText: { fontSize: 16, color: '#153f31', fontWeight: '500' },
+  feeTypeOptionTextSelected: { color: '#0bb24c', fontWeight: '700' },
   welcomeEmoji: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   stepItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f6fbf7', padding: 14, borderRadius: 12, marginTop: 12 },
   stepNumber: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0bb24c', alignItems: 'center', justifyContent: 'center' },

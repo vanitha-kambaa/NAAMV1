@@ -1,4 +1,5 @@
 import FarmerBottomNav from '@/components/farmer-bottom-nav';
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
 import { API_CONFIG } from '@/config/api';
@@ -66,7 +67,7 @@ export default function LeaderScreen() {
           style={styles.topAppBarLogo}
           resizeMode="contain"
         />
-        <View style={{ width: 36 }} />
+        <HeaderNotificationIcon />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>

@@ -1,3 +1,4 @@
+import { RemoteImage } from '@/components/RemoteImage';
 import { ThemedText } from '@/components/themed-text';
 import { API_CONFIG } from '@/config/api';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -5,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type SideMenuContextValue = {
   open: () => void;
@@ -85,7 +86,6 @@ export function useSideMenu() {
 function GlobalSideMenu({ isOpen, onClose, user, profileCompletion }: { isOpen: boolean; onClose: () => void; user: any | null; profileCompletion: number }) {
   const { language, setLanguage } = useLanguage();
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   
   const displayName = user?.fullname || user?.name || user?.first_name || (language === 'ta' ? 'முருகன் குமார்' : 'User Name');
   const displayPhone = user?.mobile_no || user?.mobile || user?.phone || (language === 'ta' ? '9876543210' : '9876543210');
@@ -94,9 +94,6 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion }: { isOpen: 
   useEffect(() => {
     const loadProfileImage = async () => {
       try {
-        // Reset image load failed state when loading new image
-        setImageLoadFailed(false);
-        
         // Try to get profile_images from AsyncStorage
         const profileImagesStr = await AsyncStorage.getItem('profile_images');
         if (profileImagesStr) {
@@ -126,11 +123,9 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion }: { isOpen: 
         // No profile image found
         console.log('No profile image found, using default');
         setProfileImageUrl(null);
-        setImageLoadFailed(false);
       } catch (e) {
         console.warn('Error loading profile image:', e);
         setProfileImageUrl(null);
-        setImageLoadFailed(false);
       }
     };
 
@@ -161,22 +156,7 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion }: { isOpen: 
       <View style={[styles.sideMenu, isOpen ? styles.sideMenuOpen : {}]} pointerEvents={isOpen ? 'auto' : 'none'}>
         <View style={styles.menuHeader}>
           <View style={styles.avatarWrap}>
-            {profileImageUrl && !imageLoadFailed ? (
-              <Image 
-                source={{ uri: profileImageUrl }} 
-                style={styles.avatar}
-                onError={(error) => {
-                  console.log('Profile image load error:', error.nativeEvent.error);
-                  setImageLoadFailed(true);
-                }}
-                onLoad={() => {
-                  console.log('Profile image loaded successfully');
-                  setImageLoadFailed(false);
-                }}
-              />
-            ) : (
-              <Image source={require('../assets/images/coconut-trees.png')} style={styles.avatar} />
-            )}
+            <RemoteImage uri={profileImageUrl ?? undefined} style={styles.avatar} />
           </View>
           <View style={{ marginLeft: 12, flex: 1 }}>
             <ThemedText style={styles.userName}>{displayName}</ThemedText>

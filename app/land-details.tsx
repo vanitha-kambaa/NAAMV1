@@ -1,25 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Linking,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
-import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 
+import { RemoteImage } from '@/components/RemoteImage';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_CONFIG, API_ENDPOINTS } from '@/config/api';
@@ -956,10 +956,10 @@ export default function LandDetailsPage() {
                       selectedLand.geo_photo ? (
                         <View style={styles.imageContainer}>
                           <TouchableOpacity onPress={() => viewImage(`https://tlzwdzgp-9000.inc1.devtunnels.ms/uploads/${selectedLand.geo_photo}`)}>
-                            <Image 
-                              source={{ uri: `https://tlzwdzgp-9000.inc1.devtunnels.ms/uploads/${selectedLand.geo_photo}` }}
+                            <RemoteImage 
+                              uri={`https://tlzwdzgp-9000.inc1.devtunnels.ms/uploads/${selectedLand.geo_photo}`}
                               style={styles.thumbnailImage}
-                              contentFit="cover"
+                              resizeMode="cover"
                             />
                           </TouchableOpacity>
                         </View>
@@ -970,10 +970,10 @@ export default function LandDetailsPage() {
                   </View>
                   {editData?.geo_photo && isEditing && (
                     <TouchableOpacity onPress={() => viewImage(editData.geo_photo!)}>
-                      <Image 
-                        source={{ uri: editData.geo_photo }}
+                      <RemoteImage 
+                        uri={editData.geo_photo}
                         style={styles.thumbnailImage}
-                        contentFit="cover"
+                        resizeMode="cover"
                       />
                     </TouchableOpacity>
                   )}
@@ -1323,10 +1323,10 @@ export default function LandDetailsPage() {
                 <IconSymbol name="xmark" size={30} color="#ffffff" />
               </TouchableOpacity>
               {selectedImage && (
-                <Image 
-                  source={{ uri: selectedImage }}
+                <RemoteImage 
+                  uri={selectedImage}
                   style={styles.fullScreenImage}
-                  contentFit="contain"
+                  resizeMode="contain"
                 />
               )}
             </View>

@@ -1,4 +1,5 @@
 import { InvestorFarmersList } from '@/components/investor-farmers-list';
+import { RemoteImage } from '@/components/RemoteImage';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_CONFIG } from '@/config/api';
@@ -15,7 +16,6 @@ import {
     Animated,
     Dimensions,
     FlatList,
-    Image,
     Linking,
     Modal,
     ScrollView,
@@ -914,7 +914,7 @@ export default function Dashboard() {
               {selectedEvent && (
                 <ScrollView style={styles.slideBody} showsVerticalScrollIndicator={false}>
                   {selectedEvent.image_url && (
-                    <Image source={{ uri: selectedEvent.image_url }} style={styles.slideImage} />
+                    <RemoteImage uri={selectedEvent.image_url} style={styles.slideImage} />
                   )}
                   <ThemedText style={styles.slideEventTitle}>{selectedEvent.event_name}</ThemedText>
                   <View style={styles.slideInfoRow}>

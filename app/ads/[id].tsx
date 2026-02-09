@@ -11,12 +11,8 @@ import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, ScrollView,
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// RemoteImage helper (local fallback)
-function RemoteImage({ uri, style, resizeMode }: { uri?: string; style?: any; resizeMode?: any }) {
-    const [failed, setFailed] = React.useState(false);
-    const src = !uri || failed ? require('../../assets/images/coconut-trees.png') : { uri };
-    return <Image source={src} style={style} resizeMode={resizeMode} onError={() => setFailed(true)} />;
-}
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
+import { RemoteImage } from '@/components/RemoteImage';
 
 export default function AdDetail() {
     const { language } = useLanguage();
@@ -252,7 +248,7 @@ export default function AdDetail() {
                     style={styles.topAppBarLogo}
                     resizeMode="contain"
                 />
-                <View style={{ width: 36 }} />
+                <HeaderNotificationIcon />
             </View>
 
             {loading ? (
