@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "74998480991",
+    "firebase_url": "https://namm-105d6-default-rtdb.firebaseio.com",
+    "project_id": "namm-105d6",
+    "storage_bucket": "namm-105d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74998480991:android:9ba907eaef1fc633fb5bea",
+        "android_client_info": {
+          "package_name": "com.anonymous.NAAM"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYwXRVNY64ekaCb_trf33Hq7hUBeOn-Zs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
