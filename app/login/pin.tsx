@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_CONFIG } from '@/config/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getFCMToken, requestNotificationPermissions } from '@/services/fcm';
 
 export default function PinLogin() {
   const router = useRouter();
@@ -23,14 +24,67 @@ export default function PinLogin() {
   // Use central BASE_URL from config instead of a static IP
   const PIN_LOGIN_URL = `${API_CONFIG.BASE_URL}/users/login/pin`;
 
+  // Helper function to get FCM push token
+  const getPushToken = async (): Promise<string | null> => {
+    try {
+      console.log(`[${Platform.OS}] Starting FCM token retrieval...`);
+      
+      // Request notification permissions first
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        console.warn(`[${Platform.OS}] ⚠️ Notification permission not granted. Skipping FCM token.`);
+        return null;
+      }
+      
+      // Get FCM token
+      const fcmToken = await getFCMToken();
+      
+      if (fcmToken) {
+        console.log(`[${Platform.OS}] ✅ FCM token retrieved successfully`);
+        console.log(`[${Platform.OS}] Token length:`, fcmToken.length);
+        return fcmToken;
+      } else {
+        console.warn(`[${Platform.OS}] ⚠️ Failed to get FCM token`);
+        return null;
+      }
+    } catch (error: any) {
+      console.error(`[${Platform.OS}] ❌ Error getting FCM token:`, error);
+      console.error(`[${Platform.OS}] Error message:`, error?.message || 'Unknown error');
+      // Return null gracefully - don't block login if FCM token fails
+      return null;
+    }
+  };
+
   const handlePinLogin = async () => {
     if (!canLogin) return;
     setLoading(true);
     try {
+      // Get push token before login
+      const pushToken = await getPushToken();
+      console.log(`[${Platform.OS}] 🔑 Push token for login:`, pushToken);
+      console.log(`[${Platform.OS}] 🔑 Push token exists:`, !!pushToken);
+      
+      const requestBody: {
+        mobile_no: string;
+        password: string;
+        platform: string;
+        device_token?: string;
+      } = { 
+        mobile_no: mobileNumber, 
+        password,
+        platform: Platform.OS,
+      };
+      
+      if (pushToken) {
+        requestBody.device_token = pushToken;
+      }
+      
+      console.log(`[${Platform.OS}] Login request body:`, JSON.stringify(requestBody, null, 2));
+      
       const res = await fetch(PIN_LOGIN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile_no: mobileNumber, password }),
+        body: JSON.stringify(requestBody),
       });
       const data = await res.json();
       if (res.ok && data?.status === 'success') {
@@ -42,7 +96,9 @@ export default function PinLogin() {
           await AsyncStorage.setItem('userRole', roleName);
           await AsyncStorage.setItem('userData', JSON.stringify(data.data.user));
         }
-        // Navigate to farmer-specific dashboard for farmers, otherwise the default dashboard
+        // Clear navigation stack and navigate to dashboard
+        // Using dismissAll to clear any modals/overlays, then replace to clear backstack
+        router.dismissAll();
         if (roleName === 'farmer') {
           router.replace('/dashboard-farmer');
         } else {

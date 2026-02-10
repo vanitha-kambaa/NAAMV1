@@ -2,10 +2,11 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_CONFIG } from '@/config/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getFCMToken, requestNotificationPermissions } from '@/services/fcm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Dimensions, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 export default function FarmerLogin() {
@@ -31,6 +32,37 @@ export default function FarmerLogin() {
   const REQUEST_OTP_URL = `${API_CONFIG.BASE_URL}/users/login/request-otp`;
   // Verify OTP endpoint (use BASE_URL from config)
   const VERIFY_OTP_URL = `${API_CONFIG.BASE_URL}/users/login/verify-otp`;
+
+  // Helper function to get FCM push token
+  const getPushToken = async (): Promise<string | null> => {
+    try {
+      console.log(`[${Platform.OS}] Starting FCM token retrieval...`);
+      
+      // Request notification permissions first
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        console.warn(`[${Platform.OS}] ⚠️ Notification permission not granted. Skipping FCM token.`);
+        return null;
+      }
+      
+      // Get FCM token
+      const fcmToken = await getFCMToken();
+      
+      if (fcmToken) {
+        console.log(`[${Platform.OS}] ✅ FCM token retrieved successfully`);
+        console.log(`[${Platform.OS}] Token length:`, fcmToken.length);
+        return fcmToken;
+      } else {
+        console.warn(`[${Platform.OS}] ⚠️ Failed to get FCM token`);
+        return null;
+      }
+    } catch (error: any) {
+      console.error(`[${Platform.OS}] ❌ Error getting FCM token:`, error);
+      console.error(`[${Platform.OS}] Error message:`, error?.message || 'Unknown error');
+      // Return null gracefully - don't block login if FCM token fails
+      return null;
+    }
+  };
 
   const handleSendOtp = async () => {
     if (!mobileNumber) {
@@ -89,10 +121,32 @@ export default function FarmerLogin() {
     }
 
     try {
+      // Get push token before login
+      const pushToken = await getPushToken();
+      console.log(`[${Platform.OS}] 🔑 Push token for login:`, pushToken);
+      console.log(`[${Platform.OS}] 🔑 Push token exists:`, !!pushToken);
+      
+      const requestBody: {
+        mobile_no: string;
+        otp: string;
+        platform: string;
+        device_token?: string;
+      } = { 
+        mobile_no: mobileNumber, 
+        otp: otpToVerify,
+        platform: Platform.OS,
+      };
+      
+      if (pushToken) {
+        requestBody.device_token = pushToken;
+      }
+      
+      console.log(`[${Platform.OS}] Login request body:`, JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch(VERIFY_OTP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile_no: mobileNumber, otp: otpToVerify }),
+        body: JSON.stringify(requestBody),
       });
       const data = await response.json();
 
@@ -124,7 +178,9 @@ export default function FarmerLogin() {
         if (data.data?.profile_images && Array.isArray(data.data.profile_images)) {
           await AsyncStorage.setItem('profile_images', JSON.stringify(data.data.profile_images));
         }
-        // Navigate to farmer-specific dashboard for farmers, otherwise the default dashboard
+        // Clear navigation stack and navigate to dashboard
+        // Using dismissAll to clear any modals/overlays, then replace to clear backstack
+        router.dismissAll();
         if (roleName === 'farmer') {
           router.replace('/dashboard-farmer');
         } else {

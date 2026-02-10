@@ -8,6 +8,19 @@ import { SideMenuProvider } from '@/components/SideMenu';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { registerBackgroundMessageHandler } from '@/services/fcm';
+import { Platform } from 'react-native';
+
+// Register FCM background message handler (must be at top level, outside components)
+if (Platform.OS !== 'web') {
+  try {
+    registerBackgroundMessageHandler();
+  } catch (error) {
+    // Firebase might not be ready yet, but this is safe to ignore
+    // The handler will be registered when Firebase initializes
+    console.log('Background message handler registration deferred:', error);
+  }
+}
 
 // Suppress known benign expo-keep-awake errors (camera/location on web or certain device states)
 LogBox.ignoreLogs(['Unable to activate keep awake', 'Unable to deactivate keep awake']);

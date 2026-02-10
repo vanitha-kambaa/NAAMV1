@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NAAM",
-    "slug": "NAAM",
+    "slug": "naam",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,7 +9,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.NAAM",
+      "googleServicesFile": "./ios/NAAM/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.NAAM"
+      "package": "com.anonymous.NAAM",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "output": "static",
@@ -38,11 +41,31 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0bb24c",
+          "sounds": [],
+          "mode": "production"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8b701ebb-2fd9-4dc5-8d11-e7ec874d0458"
+      },
+      "firebase": {
+        "projectId": "namm-105d6",
+        "projectNumber": "74998480991"
+      },
+      "router": {}
+    },
+    "owner": "subramaninaga"
   }
 }
