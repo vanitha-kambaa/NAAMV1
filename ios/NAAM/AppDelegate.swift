@@ -16,43 +16,14 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Call super first - this is critical for proper initialization
+    // Initialize Firebase BEFORE React Native starts, but AFTER super.application()
+    // This ensures Expo is initialized first, then Firebase, then React Native
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     
-    // Initialize Firebase with error handling
-    do {
-      FirebaseApp.configure()
-      print("✅ Firebase configured successfully")
-    } catch {
-      print("❌ Firebase configuration error: \(error)")
-      // Continue anyway - Firebase might still work
-    }
+    // Setup Firebase after super but before React Native starts
+    setupFirebase(application: application)
     
-    // Set Firebase Messaging delegate
-    Messaging.messaging().delegate = self
-    
-    // Request notification permissions for iOS
-    if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self
-      let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-      UNUserNotificationCenter.current().requestAuthorization(
-        options: authOptions,
-        completionHandler: { granted, error in
-          if let error = error {
-            print("❌ Notification permission error: \(error)")
-          } else {
-            print("✅ Notification permission granted: \(granted)")
-          }
-        }
-      )
-    } else {
-      let settings: UIUserNotificationSettings =
-        UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
-      application.registerUserNotificationSettings(settings)
-    }
-    
-    application.registerForRemoteNotifications()
-    
+    // Set up React Native
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -72,14 +43,81 @@ public class AppDelegate: ExpoAppDelegate {
     return result
   }
   
+  private func setupFirebase(application: UIApplication) {
+    print("🔥 [Firebase] Starting Firebase setup...")
+    
+    // Check if Firebase is already configured
+    if let existingApp = FirebaseApp.app() {
+      print("✅ [Firebase] Firebase already configured: \(existingApp.name)")
+      // Still set up delegates even if already configured
+      setupFirebaseDelegates(application: application)
+      return
+    }
+    
+    // Check if GoogleService-Info.plist exists
+    guard let plistPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") else {
+      print("❌ [Firebase] GoogleService-Info.plist not found in Bundle.main")
+      print("   [Firebase] Make sure GoogleService-Info.plist is added to the Xcode project")
+      print("   [Firebase] and included in the app target's Copy Bundle Resources")
+      return
+    }
+    
+    print("✅ [Firebase] GoogleService-Info.plist found at: \(plistPath)")
+    
+    // Initialize Firebase - this must be called before any Firebase operations
+    do {
+      FirebaseApp.configure()
+      print("✅ [Firebase] FirebaseApp.configure() called successfully")
+    } catch {
+      print("❌ [Firebase] Error calling FirebaseApp.configure(): \(error)")
+      return
+    }
+    
+    // Verify Firebase is initialized
+    guard let app = FirebaseApp.app() else {
+      print("❌ [Firebase] Firebase app instance is nil after configuration")
+      print("   [Firebase] This should not happen - Firebase may not be properly linked")
+      return
+    }
+    
+    print("✅ [Firebase] Firebase app instance verified: \(app.name)")
+    print("✅ [Firebase] Project ID: \(app.options.projectID ?? "unknown")")
+    print("✅ [Firebase] Firebase is ready for JavaScript to use")
+    
+    // Set up delegates
+    setupFirebaseDelegates(application: application)
+    
+    print("🔥 [Firebase] Firebase setup complete!")
+  }
+  
+  private func setupFirebaseDelegates(application: UIApplication) {
+    // Set messaging delegate
+    Messaging.messaging().delegate = self
+    print("✅ [Firebase] Messaging delegate set")
+    
+    // Set up notification center delegate
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self
+      print("✅ [Firebase] Notification center delegate set")
+    }
+    
+    // Register for remote notifications
+    application.registerForRemoteNotifications()
+    print("✅ [Firebase] Registered for remote notifications")
+  }
+  
   // Handle APNS token registration
   public override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-    Messaging.messaging().apnsToken = deviceToken
+    // Only set APNS token if Firebase is configured
+    if FirebaseApp.app() != nil {
+      Messaging.messaging().apnsToken = deviceToken
+      print("✅ APNS token set for Firebase")
+    }
   }
   
   // Handle APNS token registration failure
   public override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-    print("Failed to register for remote notifications: \(error)")
+    print("⚠️ Failed to register for remote notifications: \(error)")
   }
 
   // Linking API - Expo handles this through super.application()
@@ -110,11 +148,40 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   }
 
   override func bundleURL() -> URL? {
-#if DEBUG
-    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
-#else
-    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
-#endif
+    let bundleProvider = RCTBundleURLProvider.sharedSettings()
+    
+    // Try the standard Expo entry point first
+    if let metroURL = bundleProvider.jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry") {
+      print("✅ Using Metro bundler URL: \(metroURL.absoluteString)")
+      return metroURL
+    }
+    
+    // Try alternative entry points
+    if let altURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
+      print("✅ Using alternative Metro URL: \(altURL.absoluteString)")
+      return altURL
+    }
+    
+    // Fallback to embedded bundle if Metro is not available
+    if let embeddedBundle = Bundle.main.url(forResource: "main", withExtension: "jsbundle") {
+      print("✅ Using embedded bundle")
+      return embeddedBundle
+    }
+    
+    // Last resort: Check if we're in Debug mode and Metro should be running
+    #if DEBUG
+    print("❌ DEBUG mode: No Metro bundler found and no embedded bundle")
+    print("   Solution 1: Start Metro and restart app")
+    print("     Run: npx expo start")
+    print("   Solution 2: Rebuild with Metro")
+    print("     Run: npx expo run:ios --device")
+    #else
+    print("❌ RELEASE mode: No embedded bundle found")
+    print("   Rebuild with embedded bundle:")
+    print("     Run: npx expo run:ios --device --configuration Release")
+    #endif
+    
+    return nil
   }
 }
 

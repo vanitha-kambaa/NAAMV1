@@ -1,5 +1,5 @@
 import { API_CONFIG } from '@/config/api';
-import { getFCMToken, requestNotificationPermissions } from '@/services/fcm';
+import { ensureFirebaseReady, getFCMToken, requestNotificationPermissions } from '@/services/fcm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
@@ -89,8 +89,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           sendTokenToBackend(token);
         }
 
+        // Ensure Firebase is ready before setting up message listeners
+        console.log('🔍 Ensuring Firebase is ready for message listeners...');
+        const firebaseReady = await ensureFirebaseReady();
+        if (!firebaseReady) {
+          console.warn('⚠️ Firebase not fully ready, but will try to set up listeners anyway');
+          // Wait a bit more
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
         // Listen for foreground messages
-        unsubscribeForeground = messaging().onMessage(async remoteMessage => {
+        try {
+          unsubscribeForeground = messaging().onMessage(async remoteMessage => {
           console.log('FCM message received in foreground: Subbu ', remoteMessage);
           
           // Show local notification when app is in foreground
@@ -129,30 +139,51 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           
           // Refresh notifications when a new one arrives
           fetchNotifications();
-        });
+          });
+          console.log('✅ Foreground message listener registered');
+        } catch (foregroundError: any) {
+          console.error('❌ Error setting up foreground message listener:', foregroundError);
+        }
 
         // Handle notification when app is opened from background/quit state
-        unsubscribeOpenedApp = messaging().onNotificationOpenedApp(remoteMessage => {
-          console.log('Notification opened app from background:Subbu ', remoteMessage);
-          fetchNotifications();
-        });
+        try {
+          unsubscribeOpenedApp = messaging().onNotificationOpenedApp(remoteMessage => {
+            console.log('Notification opened app from background:Subbu ', remoteMessage);
+            fetchNotifications();
+          });
+          console.log('✅ Background notification listener registered');
+        } catch (backgroundError: any) {
+          console.error('❌ Error setting up background notification listener:', backgroundError);
+        }
 
         // Check if app was opened from a notification (app was quit)
-        messaging()
-          .getInitialNotification()
-          .then(remoteMessage => {
-            if (remoteMessage) {
-              console.log('Notification opened app from quit state:', remoteMessage);
-              fetchNotifications();
-            }
-          });
+        try {
+          messaging()
+            .getInitialNotification()
+            .then(remoteMessage => {
+              if (remoteMessage) {
+                console.log('Notification opened app from quit state:', remoteMessage);
+                fetchNotifications();
+              }
+            })
+            .catch((error: any) => {
+              console.error('❌ Error getting initial notification:', error);
+            });
+        } catch (initialError: any) {
+          console.error('❌ Error setting up initial notification check:', initialError);
+        }
 
         // Listen for token refresh
-        unsubscribeTokenRefresh = messaging().onTokenRefresh(token => {
-          console.log('FCM token refreshed:', token);
-          setFcmToken(token);
-          sendTokenToBackend(token);
-        });
+        try {
+          unsubscribeTokenRefresh = messaging().onTokenRefresh(token => {
+            console.log('FCM token refreshed:', token);
+            setFcmToken(token);
+            sendTokenToBackend(token);
+          });
+          console.log('✅ Token refresh listener registered');
+        } catch (tokenRefreshError: any) {
+          console.error('❌ Error setting up token refresh listener:', tokenRefreshError);
+        }
       } catch (error) {
         console.error('Error setting up FCM:', error);
       }

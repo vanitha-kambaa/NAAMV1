@@ -59,5 +59,14 @@ target 'NAAM' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+    
+    # Ensure GoogleUtilities and Firebase pods have modular headers enabled
+    installer.pods_project.targets.each do |target|
+      if target.name.start_with?('GoogleUtilities') || target.name.start_with?('Firebase') || target.name.start_with?('Google')
+        target.build_configurations.each do |config|
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+    end
   end
 end
