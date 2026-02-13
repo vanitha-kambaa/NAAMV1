@@ -103,10 +103,16 @@ export default function HarvestScreen() {
 
     const [selectedFarm, setSelectedFarm] = useState<any>(null);
     const [isFarmDropdownOpen, setIsFarmDropdownOpen] = useState(false);
-    const [expandedFarmId, setExpandedFarmId] = useState<number | null>(null);
     const [farmMenuOpenId, setFarmMenuOpenId] = useState<number | string | null>(null);
     const [editingFarmId, setEditingFarmId] = useState<number | null>(null);
     const [isSavingHarvest, setIsSavingHarvest] = useState(false);
+
+    // Harvest Summary (below My Farm Details) menu and view detail
+    const [harvestSummaryMenuOpenId, setHarvestSummaryMenuOpenId] = useState<number | null>(null);
+    const [viewHarvestId, setViewHarvestId] = useState<number | null>(null);
+    const [viewHarvestDetail, setViewHarvestDetail] = useState<any>(null);
+    const [isViewHarvestLoading, setIsViewHarvestLoading] = useState(false);
+    const [editingHarvestId, setEditingHarvestId] = useState<number | null>(null);
 
     // View Farm Modal state
     const [isViewFarmModalOpen, setIsViewFarmModalOpen] = useState(false);
@@ -414,6 +420,15 @@ export default function HarvestScreen() {
     const [blackCount, setBlackCount] = useState('');
     const [copraCount, setCopraCount] = useState('');
 
+    // Add Harvest flow: 1 = Yield update form, 2 = Summary & Submit
+    const [addHarvestStep, setAddHarvestStep] = useState<1 | 2>(1);
+    const [yieldNoOfCoconut, setYieldNoOfCoconut] = useState('');
+    const [yieldAverageWeight, setYieldAverageWeight] = useState('');
+    const [yieldSellingPrice, setYieldSellingPrice] = useState('');
+    const [yieldHappyWithYield, setYieldHappyWithYield] = useState<'yes' | 'no' | ''>('');
+    const [yieldNextHarvestDate, setYieldNextHarvestDate] = useState(new Date());
+    const [showYieldNextHarvestPicker, setShowYieldNextHarvestPicker] = useState(false);
+
     // Coconut Variety Dropdown State
     const [coconutVarietyOptions, setCoconutVarietyOptions] = useState<any[]>([]);
     const [isCoconutVarietyLoading, setIsCoconutVarietyLoading] = useState(false);
@@ -688,31 +703,211 @@ export default function HarvestScreen() {
         setHarvestDate(currentDate);
     };
 
+    const handleYieldNextHarvestDateChange = (event: any, selectedDate?: Date) => {
+        const d = selectedDate || yieldNextHarvestDate;
+        setShowYieldNextHarvestPicker(Platform.OS === 'ios');
+        setYieldNextHarvestDate(d);
+    };
+
+    const closeAddHarvestModal = () => {
+        setEditingHarvestId(null);
+        setAddHarvestStep(1);
+        setYieldNoOfCoconut('');
+        setYieldAverageWeight('');
+        setYieldSellingPrice('');
+        setYieldHappyWithYield('');
+        setYieldNextHarvestDate(new Date());
+        setIsModalOpen(false);
+    };
+
+    const handleYieldUpdate = () => {
+        if (!yieldNoOfCoconut.trim()) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'தேங்காய் எண்ணிக்கையை உள்ளிடவும்' : 'Please enter No of Coconut');
+            return;
+        }
+        if (!yieldAverageWeight.trim()) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'சராசரி எடையை உள்ளிடவும்' : 'Please enter Average weight');
+            return;
+        }
+        if (!yieldSellingPrice.trim()) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'விற்பனை விலையை உள்ளிடவும்' : 'Please enter Selling Price');
+            return;
+        }
+        if (!yieldHappyWithYield) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'மகிழ்ச்சியான விளைச்சலைத் தேர்ந்தெடுக்கவும்' : 'Please select if you are happy with yield');
+            return;
+        }
+        setAddHarvestStep(2);
+    };
+
+    const handleYieldSubmit = () => {
+        setGreenCount(yieldNoOfCoconut);
+        setBlackCount('0');
+        setCopraCount('0');
+        setHarvestDate(yieldNextHarvestDate);
+        handleSaveHarvest();
+    };
+
+    const handleViewHarvest = async (harvest: any) => {
+        setHarvestSummaryMenuOpenId(null);
+        const harvestId = harvest.id;
+        if (!harvestId) {
+            setViewHarvestDetail(harvest);
+            return;
+        }
+        setViewHarvestId(harvestId);
+        setViewHarvestDetail(null);
+        setIsViewHarvestLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('authToken');
+            const res = await fetch(`${API_CONFIG.BASE_URL}/harvests/${harvestId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
+            });
+            const json = await res.json();
+            if (res.ok && (json.status === 'success' || json.success)) {
+                setViewHarvestDetail(json.data ?? json);
+            } else {
+                const msg = json?.message || json?.detail || (language === 'ta' ? 'விவரங்களை ஏற்ற முடியவில்லை' : 'Failed to load harvest details');
+                Alert.alert(language === 'ta' ? 'பிழை' : 'Error', msg);
+                setViewHarvestId(null);
+            }
+        } catch (err: any) {
+            console.error('Error fetching harvest detail:', err);
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'விவரங்களை ஏற்ற முடியவில்லை' : 'Failed to load harvest details');
+            setViewHarvestId(null);
+        } finally {
+            setIsViewHarvestLoading(false);
+        }
+    };
+
+    const handleEditHarvest = (harvest: any) => {
+        setHarvestSummaryMenuOpenId(null);
+        const farm = data?.my_farms?.find((f: any) => (f.land_id || f.farm_id) === harvest.land_id);
+        if (farm) {
+            setEditingHarvestId(harvest.id);
+            setSelectedFarm(farm);
+            setYieldNoOfCoconut(String(harvest.no_of_coconut ?? harvest.green_coconut ?? ''));
+            setYieldAverageWeight(String(harvest.average_weight ?? ''));
+            setYieldSellingPrice(String(harvest.price_per_coconut ?? ''));
+            setYieldHappyWithYield(harvest.happy_yield === 'Yes' ? 'yes' : harvest.happy_yield === 'No' ? 'no' : '');
+            setYieldNextHarvestDate(harvest.next_harvest ? new Date(harvest.next_harvest) : new Date());
+            setAddHarvestStep(1);
+            setIsModalOpen(true);
+        } else {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'பண்ணை காணப்படவில்லை' : 'Farm not found');
+        }
+    };
+
+    const handleDeleteHarvest = async (harvest: any) => {
+        setHarvestSummaryMenuOpenId(null);
+        const harvestId = harvest?.id;
+        if (!harvestId) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'அறுவடை அடையாளம் இல்லை' : 'Harvest id not found');
+            return;
+        }
+        Alert.alert(
+            language === 'ta' ? 'அறுவடையை நீக்கு' : 'Delete Harvest',
+            language === 'ta' ? 'இந்த அறுவடை பதிவை நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this harvest record?',
+            [
+                { text: language === 'ta' ? 'ரத்து' : 'Cancel', style: 'cancel' },
+                {
+                    text: language === 'ta' ? 'நீக்கு' : 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const token = await AsyncStorage.getItem('authToken');
+                            const res = await fetch(`${API_CONFIG.BASE_URL}/harvests/${harvestId}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
+                            });
+                            const text = await res.text();
+                            const json = text ? JSON.parse(text) : {};
+                            if (res.ok || res.status === 204) {
+                                Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'அறுவடை நீக்கப்பட்டது' : 'Harvest deleted successfully');
+                                fetchHarvestData();
+                            } else {
+                                Alert.alert(language === 'ta' ? 'பிழை' : 'Error', json?.message || (language === 'ta' ? 'நீக்க முடியவில்லை' : 'Failed to delete'));
+                            }
+                        } catch (err: any) {
+                            console.error('Error deleting harvest:', err);
+                            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'நீக்க முடியவில்லை' : 'Failed to delete');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleSaveHarvest = async () => {
-        if (!selectedFarm) {
+        if (!editingHarvestId && !selectedFarm) {
             Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'தயவுசெய்து பண்ணையைத் தேர்ந்தெடுக்கவும்' : 'Please select a farm');
             return;
         }
-        if (!greenCount && !blackCount && !copraCount) {
-            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'குறைந்தபட்சம் ஒரு அளவை உள்ளிடவும்' : 'Please enter at least one quantity');
+        if (!yieldNoOfCoconut.trim() || !yieldAverageWeight.trim() || !yieldSellingPrice.trim() || !yieldHappyWithYield) {
+            Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'அனைத்து புலங்களையும் நிரப்பவும்' : 'Please fill all yield fields');
             return;
         }
 
-        // Resolve land id (API expects land_id)
-        const landId = selectedFarm.land_id || selectedFarm.farm_id || selectedFarm.id;
-
-        // Build payload according to API spec
-        const payload: any = {
-            land_id: landId,
-            harvest_date: harvestDate instanceof Date ? harvestDate.toISOString().slice(0, 10) : String(harvestDate),
-            green_coconut: greenCount ? Number(greenCount) : 0,
-            black_coconut: blackCount ? Number(blackCount) : 0,
-            copra: copraCount ? parseFloat(copraCount) : 0
-        };
-
+        const harvestDateStr = (d: Date) => d.toISOString().slice(0, 10);
+        const token = await AsyncStorage.getItem('authToken');
         setIsSavingHarvest(true);
+
         try {
-            const token = await AsyncStorage.getItem('authToken');
+            if (editingHarvestId) {
+                // PUT /harvests/:id - update existing harvest
+                const payload: any = {
+                    no_of_coconut: Number(yieldNoOfCoconut) || 0,
+                    average_weight: Number(yieldAverageWeight) || 0,
+                    price_per_coconut: Number(yieldSellingPrice) || 0,
+                    happy_yield: yieldHappyWithYield === 'yes' ? 'Yes' : 'No',
+                    next_harvest: harvestDateStr(yieldNextHarvestDate)
+                };
+                const res = await fetch(`${API_CONFIG.BASE_URL}/harvests/${editingHarvestId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json();
+                if (res.ok && (json.status === 'success' || json.success)) {
+                    setEditingHarvestId(null);
+                    setAddHarvestStep(1);
+                    setYieldNoOfCoconut('');
+                    setYieldAverageWeight('');
+                    setYieldSellingPrice('');
+                    setYieldHappyWithYield('');
+                    setYieldNextHarvestDate(new Date());
+                    setSelectedFarm(null);
+                    setIsModalOpen(false);
+                    Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'அறுவடை புதுப்பிக்கப்பட்டது. நன்றி!' : 'Harvest updated successfully. Thank you!');
+                    fetchHarvestData();
+                } else {
+                    const msg = json?.message || json?.detail || 'Failed to update harvest';
+                    Alert.alert(language === 'ta' ? 'பிழை' : 'Error', msg);
+                }
+                return;
+            }
+
+            // POST - create new harvest
+            const landId = selectedFarm.land_id || selectedFarm.farm_id || selectedFarm.id;
+            const payload: any = {
+                land_id: Number(landId),
+                harvest_date: harvestDateStr(new Date()),
+                no_of_coconut: Number(yieldNoOfCoconut) || 0,
+                average_weight: Number(yieldAverageWeight) || 0,
+                price_per_coconut: Number(yieldSellingPrice) || 0,
+                happy_yield: yieldHappyWithYield === 'yes' ? 'Yes' : 'No',
+                next_harvest: harvestDateStr(yieldNextHarvestDate)
+            };
             const res = await fetch(`${API_CONFIG.BASE_URL}/harvests`, {
                 method: 'POST',
                 headers: {
@@ -724,15 +919,18 @@ export default function HarvestScreen() {
 
             const json = await res.json();
             if (res.ok && (json.status === 'success' || json.success)) {
-                // Reset and close
                 setGreenCount('');
                 setBlackCount('');
                 setCopraCount('');
                 setSelectedFarm(null);
+                setAddHarvestStep(1);
+                setYieldNoOfCoconut('');
+                setYieldAverageWeight('');
+                setYieldSellingPrice('');
+                setYieldHappyWithYield('');
+                setYieldNextHarvestDate(new Date());
                 setIsModalOpen(false);
-                Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'அறுவடை விபரங்கள் சேமிக்கப்பட்டது' : 'Harvest details saved successfully');
-
-                // Refresh data
+                Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'அறுவடை விபரங்கள் சேமிக்கப்பட்டது. நன்றி!' : 'Harvest details saved successfully. Thank you!');
                 fetchHarvestData();
             } else {
                 const msg = json?.message || json?.detail || 'Failed to save harvest';
@@ -1261,60 +1459,60 @@ export default function HarvestScreen() {
                         const title = farm.land_name || farm.land_id || `Farm ${idx + 1}`;
                         const taluk = language === 'ta' ? (farm.taluk_tname || farm.taluk_name) : (farm.taluk_name || farm.taluk_tname);
                         const village = language === 'ta' ? (farm.village_tname || farm.village_name) : (farm.village_name || farm.village_tname);
-                        const nextHarvest = farm.harvest_setup?.next_harvest_date || null;
+                        const nextHarvest = farm.last_harvest?.next_harvest || null;
                         const isActive = farm.coconut_status === 1 || farm.land_status === 1;
+                        const nextHarvestExceeded = nextHarvest ? new Date() > new Date(nextHarvest) : false;
+                        const showHarvestButton = !farm.last_harvest || nextHarvestExceeded;
+                        const isUpdateYield = !!farm.last_harvest && nextHarvestExceeded;
 
                         return (
                             <View key={farm.land_id || farm.farm_id || idx} style={[styles.farmCard, idx > 0 && { marginTop: 12 }]}>
-                                <View style={styles.farmHeader}>
-                                    <TouchableOpacity style={{ flex: 1 }} onPress={() => setExpandedFarmId(expandedFarmId === (farm.land_id || farm.farm_id) ? null : (farm.land_id || farm.farm_id))}>
-                                        <ThemedText style={styles.farmName}>{title}</ThemedText>
-                                    </TouchableOpacity>
-
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, position: 'relative' }}>
-                                        <View style={styles.tag}>
-                                            <View style={[styles.tagDot, { backgroundColor: isActive ? '#10b981' : '#94a3b8' }]} />
-                                            <ThemedText style={styles.tagText}>{isActive ? (language === 'ta' ? 'பச்சை' : 'Green') : (language === 'ta' ? 'முடக்கப்பட்டது' : 'Inactive')}</ThemedText>
+                                <View>
+                                    <View style={styles.farmHeader}>
+                                        <View style={{ flex: 1 }}>
+                                            <ThemedText style={styles.farmName}>{title}</ThemedText>
                                         </View>
 
-                                        <TouchableOpacity onPress={() => setExpandedFarmId(expandedFarmId === (farm.land_id || farm.farm_id) ? null : (farm.land_id || farm.farm_id))}>
-                                            <Ionicons name={expandedFarmId === (farm.land_id || farm.farm_id) ? 'chevron-up' : 'chevron-down'} size={18} color="#0f172a" />
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity onPress={() => setFarmMenuOpenId(farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) ? null : (farm.land_id || farm.farm_id || farm.id))}>
-                                            <Ionicons name="ellipsis-vertical" size={22} color="#64748b" />
-                                        </TouchableOpacity>
-                                        {farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) && (
-                                            <View style={styles.farmMenuDropdown}>
-                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleViewFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
-                                                    <Ionicons name="eye-outline" size={18} color="#3b82f6" />
-                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'பார்க்க' : 'View'}</ThemedText>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleEditFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
-                                                    <Ionicons name="create-outline" size={18} color="#f59e0b" />
-                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'திருத்து' : 'Edit'}</ThemedText>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleDeleteFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
-                                                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                                                    <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#ef4444', fontWeight: '500' }}>{language === 'ta' ? 'நீக்கு' : 'Delete'}</ThemedText>
-                                                </TouchableOpacity>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, position: 'relative' }}>
+                                            <View style={styles.tag}>
+                                                <View style={[styles.tagDot, { backgroundColor: isActive ? '#10b981' : '#94a3b8' }]} />
+                                                <ThemedText style={styles.tagText}>{isActive ? (language === 'ta' ? 'பச்சை' : 'Green') : (language === 'ta' ? 'முடக்கப்பட்டது' : 'Inactive')}</ThemedText>
                                             </View>
-                                        )}
+
+                                            <TouchableOpacity onPress={(e) => { e?.stopPropagation?.(); setFarmMenuOpenId(farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) ? null : (farm.land_id || farm.farm_id || farm.id)); }}>
+                                                <Ionicons name="ellipsis-vertical" size={22} color="#64748b" />
+                                            </TouchableOpacity>
+                                            {farmMenuOpenId === (farm.land_id || farm.farm_id || farm.id) && (
+                                                <View style={styles.farmMenuDropdown}>
+                                                    <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleViewFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                        <Ionicons name="eye-outline" size={18} color="#3b82f6" />
+                                                        <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'பார்க்க' : 'View'}</ThemedText>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleEditFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                        <Ionicons name="create-outline" size={18} color="#f59e0b" />
+                                                        <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'திருத்து' : 'Edit'}</ThemedText>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.farmMenuItem} onPress={() => { handleDeleteFarm(farm.id || farm.land_id || farm.farm_id); setFarmMenuOpenId(null); }}>
+                                                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                                        <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#ef4444', fontWeight: '500' }}>{language === 'ta' ? 'நீக்கு' : 'Delete'}</ThemedText>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.farmLocRow}>
+                                        <Ionicons name="location-outline" size={14} color="#64748b" />
+                                        <ThemedText style={styles.farmLoc}>{taluk}{taluk && village ? ', ' : ''}{village}</ThemedText>
+                                    </View>
+
+                                    <View style={styles.farmAlertRow}>
+                                        <Ionicons name="calendar-outline" size={14} color="#dc2626" />
+                                        <ThemedText style={styles.farmAlert}>{nextHarvest ? `${language === 'ta' ? 'அறுவடை செய்ய வேண்டும்' : 'Due for harvest'} ${formatDate(nextHarvest)}` : (language === 'ta' ? 'அட்டவணை இல்லை' : 'No schedule')}</ThemedText>
                                     </View>
                                 </View>
 
-                                <View style={styles.farmLocRow}>
-                                    <Ionicons name="location-outline" size={14} color="#64748b" />
-                                    <ThemedText style={styles.farmLoc}>{taluk}{taluk && village ? ', ' : ''}{village}</ThemedText>
-                                </View>
-
-                                <View style={styles.farmAlertRow}>
-                                    <Ionicons name="calendar-outline" size={14} color="#dc2626" />
-                                    <ThemedText style={styles.farmAlert}>{nextHarvest ? `${language === 'ta' ? 'அறுவடை செய்ய வேண்டும்' : 'Due for harvest'} ${formatDate(nextHarvest)}` : (language === 'ta' ? 'அட்டவணை இல்லை' : 'No schedule')}</ThemedText>
-                                </View>
-
-                                {expandedFarmId === (farm.land_id || farm.farm_id) && (
-                                    <View style={{ marginTop: 12 }}>
+                                <View style={{ marginTop: 12 }}>
                                         <View style={styles.smallStatsRow}>
                                             <View style={styles.smallStatBox}>
                                                 <ThemedText style={styles.smallStatLabel}>{language === 'ta' ? 'நிலம்' : 'Land'}</ThemedText>
@@ -1326,44 +1524,46 @@ export default function HarvestScreen() {
                                             </View>
                                             <View style={styles.smallStatBox}>
                                                 <ThemedText style={styles.smallStatLabel}>{language === 'ta' ? 'வகை' : 'Type'}</ThemedText>
-                                                <ThemedText style={styles.smallStatValue}>{farm.coconut_variety || '-'}</ThemedText>
+                                                <ThemedText style={styles.smallStatValue}>{farm.ownership_type || '-'}</ThemedText>
                                             </View>
                                         </View>
                                         <ThemedText style={{ color: '#064e3b', fontWeight: '700' }}>{language === 'ta' ? 'அறுவடை அட்டவணை' : 'Harvest Schedule'}</ThemedText>
 
-                                        {farm.harvest_setup && (
+                                        {farm.last_harvest ? (
                                             <View style={[styles.infoNote, { backgroundColor: '#ecfdf5', borderLeftColor: '#bbf7d0', marginTop: 12 }]}>
                                                 <ThemedText style={{ color: '#064e3b', fontWeight: '300', fontSize: 10 }}>{language === 'ta' ? 'கடைசி அறுவடை' : 'Last Harvest'}</ThemedText>
                                                 <View style={{ height: 8 }} />
-                                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                                    <View style={{ backgroundColor: '#fff', padding: 8, borderRadius: 8 }}>
-                                                        <ThemedText style={{ fontWeight: '300' }}>{formatDate(farm.harvest_setup.next_harvest_date)}</ThemedText>
-                                                        <ThemedText style={{ fontSize: 10, color: '#475569' }}>{farm.harvest_setup.harvest_method}</ThemedText>
+                                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                                    <View style={{ flex: 1, backgroundColor: '#fff', padding: 6, borderRadius: 8 }}>
+                                                        <ThemedText style={{ fontWeight: '600', fontSize: 12 }} numberOfLines={1}>{farm.last_harvest.harvest_date ? formatDate(farm.last_harvest.harvest_date) : '-'}</ThemedText>
+                                                        <ThemedText style={{ fontSize: 9, color: '#475569' }} numberOfLines={1}>{language === 'ta' ? 'தேதி' : 'Date'}</ThemedText>
                                                     </View>
-                                                    <View style={{ backgroundColor: '#fff', padding: 8, borderRadius: 8 }}>
-                                                        <ThemedText style={{ fontWeight: '300' }}>{farm.harvest_setup.total_weight_kg || '0'}</ThemedText>
-                                                        <ThemedText style={{ fontSize: 10, color: '#475569' }}>{language === 'ta' ? 'பச்சை' : 'Weight (kg)'}</ThemedText>
+                                                    <View style={{ flex: 1, backgroundColor: '#fff', padding: 6, borderRadius: 8 }}>
+                                                        <ThemedText style={{ fontWeight: '600', fontSize: 12 }} numberOfLines={1}>{farm.last_harvest.no_of_coconut ?? farm.last_harvest.green_coconut ?? '-'}</ThemedText>
+                                                        <ThemedText style={{ fontSize: 9, color: '#475569' }} numberOfLines={1}>{language === 'ta' ? 'எண்ணிக்கை' : 'Nos'}</ThemedText>
                                                     </View>
-                                                    <View style={{ backgroundColor: '#fff', padding: 8, borderRadius: 8 }}>
-                                                        <ThemedText style={{ fontWeight: '300' }}>{farm.harvest_setup.approximate_count || '0'}</ThemedText>
-                                                        <ThemedText style={{ fontSize: 10, color: '#475569' }}>{language === 'ta' ? 'அறுவடை எண்ணிக்கை' : 'Approx. Count'}</ThemedText>
+                                                    <View style={{ flex: 1, backgroundColor: '#fff', padding: 6, borderRadius: 8 }}>
+                                                        <ThemedText style={{ fontWeight: '600', fontSize: 12 }} numberOfLines={1}>{farm.last_harvest.average_weight != null ? `${farm.last_harvest.average_weight}g` : '-'}</ThemedText>
+                                                        <ThemedText style={{ fontSize: 9, color: '#475569' }} numberOfLines={1}>{language === 'ta' ? 'சராசரி எடை/தேங்காய்' : 'Avg.Weight/piece'}</ThemedText>
+                                                    </View>
+                                                    <View style={{ flex: 1, backgroundColor: '#fff', padding: 6, borderRadius: 8 }}>
+                                                        <ThemedText style={{ fontWeight: '600', fontSize: 12 }} numberOfLines={1}>{farm.last_harvest.price_per_coconut != null && farm.last_harvest.price_per_coconut !== '' ? `₹${farm.last_harvest.price_per_coconut}` : '-'}</ThemedText>
+                                                        <ThemedText style={{ fontSize: 9, color: '#475569' }} numberOfLines={1}>{language === 'ta' ? 'விலை/தேங்காய்' : 'Price/piece'}</ThemedText>
                                                     </View>
                                                 </View>
                                             </View>
+                                        ) : (
+                                            <ThemedText style={{ color: '#64748b', fontSize: 13, marginTop: 12 }}>{language === 'ta' ? 'கடைசி அறுவடை பதிவு இல்லை' : 'No last harvest recorded'}</ThemedText>
                                         )}
 
-
-
+                                        {showHarvestButton && (
                                         <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                                            <TouchableOpacity style={[styles.nextBtn, { flex: 1 }]} onPress={() => { setSelectedFarm(farm); setIsModalOpen(true); }}>
-                                                <ThemedText style={styles.nextBtnText}>{language === 'ta' ? 'அறுவடை சேர்க்க' : 'Add Harvest'}</ThemedText>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={[styles.outlineBtn, { flex: 1 }]} onPress={() => openChangeDateModal(farm)}>
-                                                <ThemedText style={styles.outlineBtnText}>{language === 'ta' ? 'தேதி மாற்று' : 'Change Date'}</ThemedText>
+                                            <TouchableOpacity style={[styles.nextBtn, { flex: 1, paddingHorizontal: 12, minHeight: 44 }]} onPress={() => { setEditingHarvestId(null); setSelectedFarm(farm); setIsModalOpen(true); }}>
+                                                <ThemedText style={[styles.nextBtnText, { textAlign: 'center', fontSize: 14 }]} numberOfLines={1}>{isUpdateYield ? (language === 'ta' ? 'விளைச்சலை புதுப்பிக்கு' : 'Update Yield') : (language === 'ta' ? 'அறுவடைக்கு சேர்க்க' : 'Add Harvest')}</ThemedText>
                                             </TouchableOpacity>
                                         </View>
+                                        )}
                                     </View>
-                                )}
                             </View>
                         );
                     })
@@ -1374,6 +1574,68 @@ export default function HarvestScreen() {
                             <ThemedText style={styles.addFarmButtonText}>{language === 'ta' ? '+ புதிய பண்ணை' : '+ Add Farm'}</ThemedText>
                         </TouchableOpacity>
                     </View>
+                )}
+
+                {/* Harvest Summary - below My Farm Details */}
+                {data?.harvest_history && data.harvest_history.length > 0 && (
+                    <>
+                        <View style={[styles.sectionHeaderRow, { marginTop: 24, marginBottom: 12 }]}>
+                            <View style={styles.sectionTitleWrap}>
+                                <Ionicons name="document-text-outline" size={18} color="#166534" />
+                                <ThemedText style={styles.sectionTitle}>{language === 'ta' ? 'அறுவடை சுருக்கம்' : 'Harvest Summary'}</ThemedText>
+                            </View>
+                        </View>
+                        {data.harvest_history.map((harvest: any, index: number) => {
+                            const display = (val: any) => (val != null && val !== '' ? String(val) : '-');
+                            const isMenuOpen = harvestSummaryMenuOpenId === harvest.id;
+                            return (
+                                <View key={harvest.id || index} style={[styles.harvestSummaryCard, index > 0 && { marginTop: 12 }]}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                                        <ThemedText style={styles.harvestSummaryFarmName}>{harvest.land_name || (language === 'ta' ? 'பண்ணை' : 'Farm')}</ThemedText>
+                                        <View style={{ position: 'relative' }}>
+                                            <TouchableOpacity onPress={() => setHarvestSummaryMenuOpenId(isMenuOpen ? null : harvest.id)}>
+                                                <Ionicons name="ellipsis-vertical" size={22} color="#64748b" />
+                                            </TouchableOpacity>
+                                            {isMenuOpen && (
+                                                <View style={styles.farmMenuDropdown}>
+                                                    <TouchableOpacity style={styles.farmMenuItem} onPress={() => handleEditHarvest(harvest)}>
+                                                        <Ionicons name="create-outline" size={18} color="#f59e0b" />
+                                                        <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#1e293b', fontWeight: '500' }}>{language === 'ta' ? 'திருத்து' : 'Edit'}</ThemedText>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.farmMenuItem} onPress={() => handleDeleteHarvest(harvest)}>
+                                                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                                        <ThemedText style={{ marginLeft: 10, fontSize: 14, color: '#ef4444', fontWeight: '500' }}>{language === 'ta' ? 'நீக்கு' : 'Delete'}</ThemedText>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <View style={styles.harvestSummaryGrid}>
+                                        <View style={styles.harvestSummaryItem}>
+                                            <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'அறுவடை தேதி' : 'Harvest date'}</ThemedText>
+                                            <ThemedText style={styles.harvestSummaryValue}>{harvest.harvest_date ? formatDate(harvest.harvest_date) : '-'}</ThemedText>
+                                        </View>
+                                        <View style={styles.harvestSummaryItem}>
+                                            <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'தேங்காய் எண்ணிக்கை' : 'No of coconuts'}</ThemedText>
+                                            <ThemedText style={styles.harvestSummaryValue}>{display(harvest.no_of_coconut ?? harvest.green_coconut)}</ThemedText>
+                                        </View>
+                                        <View style={styles.harvestSummaryItem}>
+                                            <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'சராசரி எடை/தேங்காய்' : 'Average weight/Piece'}</ThemedText>
+                                            <ThemedText style={styles.harvestSummaryValue}>{harvest.average_weight != null ? `${harvest.average_weight}g` : '-'}</ThemedText>
+                                        </View>
+                                        <View style={styles.harvestSummaryItem}>
+                                            <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'விலை/தேங்காய்' : 'Price/coconut'}</ThemedText>
+                                            <ThemedText style={styles.harvestSummaryValue}>{harvest.price_per_coconut != null && harvest.price_per_coconut !== '' ? `₹${harvest.price_per_coconut}` : '-'}</ThemedText>
+                                        </View>
+                                        <View style={[styles.harvestSummaryItem, { borderBottomWidth: 0 }]}>
+                                            <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'அடுத்த அறுவடை' : 'Next harvest'}</ThemedText>
+                                            <ThemedText style={styles.harvestSummaryValue}>{harvest.next_harvest ? formatDate(harvest.next_harvest) : '-'}</ThemedText>
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </>
                 )}
 
                 {/* Page-level Harvest Schedule Button */}
@@ -1457,8 +1719,8 @@ export default function HarvestScreen() {
                 )}
             </ScrollView>
 
-            {/* Add Harvest Modal */}
-            <Modal animationType="slide" transparent={true} visible={isModalOpen} onRequestClose={() => setIsModalOpen(false)}>
+            {/* Add Harvest Modal - Yield update form then Summary & Submit */}
+            <Modal animationType="slide" transparent={true} visible={isModalOpen} onRequestClose={closeAddHarvestModal}>
                 <SafeAreaView style={{ flex: 1 }} edges={[]}>
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1467,8 +1729,12 @@ export default function HarvestScreen() {
                         <View style={styles.modalOverlay}>
                             <View style={styles.modalContent}>
                                 <View style={styles.modalHeader}>
-                                    <ThemedText style={styles.modalTitle}>{language === 'ta' ? 'புதிய அறுவடை சேர்க்க' : 'Add New Harvest'}</ThemedText>
-                                    <TouchableOpacity onPress={() => setIsModalOpen(false)}>
+                                    <ThemedText style={styles.modalTitle}>
+                                        {addHarvestStep === 1
+                                            ? (editingHarvestId ? (language === 'ta' ? 'அறுவடை திருத்து' : 'Edit Harvest') : (language === 'ta' ? 'புதிய அறுவடை சேர்க்க' : 'Add New Harvest'))
+                                            : (language === 'ta' ? 'சுருக்கம்' : 'Summary')}
+                                    </ThemedText>
+                                    <TouchableOpacity onPress={closeAddHarvestModal}>
                                         <Ionicons name="close" size={24} color="#64748b" />
                                     </TouchableOpacity>
                                 </View>
@@ -1478,91 +1744,158 @@ export default function HarvestScreen() {
                                     keyboardShouldPersistTaps="handled"
                                     contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                                 >
-                                    {/* Farm Selector */}
-                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'பண்ணையைத் தேர்ந்தெடுக்கவும்' : 'Select Farm'}</ThemedText>
-                                    <TouchableOpacity style={styles.dropdownBtn} onPress={() => setIsFarmDropdownOpen(!isFarmDropdownOpen)}>
-                                        <ThemedText style={selectedFarm ? styles.inputText : styles.placeholderText}>
-                                            {selectedFarm ? (selectedFarm.land_name || selectedFarm.farm_id || selectedFarm.land_id) : (language === 'ta' ? 'தேர்ந்தெடு...' : 'Select...')}
-                                        </ThemedText>
-                                        <Ionicons name="chevron-down" size={20} color="#64748b" />
-                                    </TouchableOpacity>
+                                    {addHarvestStep === 1 ? (
+                                        <>
+                                            {/* Yield update form */}
+                                            <ThemedText style={[styles.inputLabel, { fontSize: 16, fontWeight: '700', marginBottom: 12 }]}>{language === 'ta' ? 'விளைச்சல் புதுப்பிப்பு' : 'Yield update'}</ThemedText>
 
-                                    {isFarmDropdownOpen && data?.my_farms && (
-                                        <View style={styles.dropdownList}>
-                                            {data.my_farms.map((farm: any) => (
+                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'தேங்காய் எண்ணிக்கை' : 'No of Coconut'}</ThemedText>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                                <TextInput
+                                                    style={[styles.input, { flex: 1 }]}
+                                                    keyboardType="numeric"
+                                                    placeholder="2500"
+                                                    value={yieldNoOfCoconut}
+                                                    onChangeText={setYieldNoOfCoconut}
+                                                />
+                                                <ThemedText style={{ marginLeft: 8, color: '#64748b', fontSize: 14 }}>{language === 'ta' ? 'துண்டுகள்' : 'Pieces'}</ThemedText>
+                                            </View>
+
+                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'சராசரி எடை' : 'Average weight'}</ThemedText>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                                <TextInput
+                                                    style={[styles.input, { flex: 1 }]}
+                                                    keyboardType="numeric"
+                                                    placeholder="450"
+                                                    value={yieldAverageWeight}
+                                                    onChangeText={setYieldAverageWeight}
+                                                />
+                                                <ThemedText style={{ marginLeft: 8, color: '#64748b', fontSize: 14 }}>g/Piece</ThemedText>
+                                            </View>
+
+                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'விற்பனை விலை' : 'Selling Price'}</ThemedText>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                                <TextInput
+                                                    style={[styles.input, { flex: 1 }]}
+                                                    keyboardType="numeric"
+                                                    placeholder="25"
+                                                    value={yieldSellingPrice}
+                                                    onChangeText={setYieldSellingPrice}
+                                                />
+                                                <ThemedText style={{ marginLeft: 8, color: '#64748b', fontSize: 14 }}>RS/Piece</ThemedText>
+                                            </View>
+
+                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'விளைச்சலில் மகிழ்ச்சியா?' : 'Are you happy with yield?'}</ThemedText>
+                                            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
                                                 <TouchableOpacity
-                                                    key={farm.land_id || farm.farm_id}
-                                                    style={styles.dropdownItem}
-                                                    onPress={() => {
-                                                        setSelectedFarm(farm);
-                                                        setIsFarmDropdownOpen(false);
-                                                    }}
+                                                    style={[styles.radioCard, yieldHappyWithYield === 'yes' && styles.radioCardSelected]}
+                                                    onPress={() => setYieldHappyWithYield('yes')}
                                                 >
-                                                    <ThemedText style={styles.dropdownItemText}>{farm.land_name || farm.farm_id}</ThemedText>
+                                                    <ThemedText style={{ fontWeight: '600', color: yieldHappyWithYield === 'yes' ? '#064e3b' : '#64748b' }}>{language === 'ta' ? 'ஆம்' : 'Yes'}</ThemedText>
                                                 </TouchableOpacity>
-                                            ))}
-                                            {(!data.my_farms || data.my_farms.length === 0) && (
-                                                <View style={styles.dropdownItem}><ThemedText style={styles.placeholderText}>{language === 'ta' ? 'பண்ணைகள் இல்லை' : 'No farms found'}</ThemedText></View>
+                                                <TouchableOpacity
+                                                    style={[styles.radioCard, yieldHappyWithYield === 'no' && styles.radioCardSelected]}
+                                                    onPress={() => setYieldHappyWithYield('no')}
+                                                >
+                                                    <ThemedText style={{ fontWeight: '600', color: yieldHappyWithYield === 'no' ? '#064e3b' : '#64748b' }}>{language === 'ta' ? 'இல்லை' : 'No'}</ThemedText>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'அடுத்த அறுவடை எப்போது திட்டமிடப்பட்டுள்ளது?' : 'When is next harvest Planned?'}</ThemedText>
+                                            <TouchableOpacity style={styles.dateInput} onPress={() => setShowYieldNextHarvestPicker(true)}>
+                                                <ThemedText style={styles.inputText}>{formatDate(yieldNextHarvestDate)}</ThemedText>
+                                                <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                                            </TouchableOpacity>
+                                            {showYieldNextHarvestPicker && (
+                                                <DateTimePicker
+                                                    value={yieldNextHarvestDate}
+                                                    mode="date"
+                                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                    onChange={handleYieldNextHarvestDateChange}
+                                                />
                                             )}
-                                        </View>
+
+                                            <View style={{ height: 20 }} />
+                                            <TouchableOpacity style={[styles.nextBtn, { backgroundColor: '#0f6b36' }]} onPress={handleYieldUpdate}>
+                                                <ThemedText style={[styles.nextBtnText, { color: '#fff' }]}>{language === 'ta' ? 'புதுப்பிக்கு' : 'UPDATE'}</ThemedText>
+                                            </TouchableOpacity>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* Summary & Submit */}
+                                            <View style={[styles.infoNote, { backgroundColor: '#ecfdf5', borderLeftColor: '#10b981', marginBottom: 20 }]}>
+                                                <ThemedText style={{ color: '#064e3b', fontWeight: '600', marginBottom: 8 }}>{language === 'ta' ? 'சுருக்கம்' : 'Summary'}</ThemedText>
+                                                <ThemedText style={{ color: '#0f172a', marginBottom: 4 }}>{language === 'ta' ? 'தேங்காய் எண்ணிக்கை' : 'No of Coconut'}: {yieldNoOfCoconut}</ThemedText>
+                                                <ThemedText style={{ color: '#0f172a', marginBottom: 4 }}>{language === 'ta' ? 'சராசரி எடை' : 'Avg weight'}: {yieldAverageWeight}g/piece</ThemedText>
+                                                <ThemedText style={{ color: '#0f172a', marginBottom: 4 }}>{language === 'ta' ? 'விலை/துண்டு' : 'Price/Piece'}: {yieldSellingPrice}/piece</ThemedText>
+                                                <ThemedText style={{ color: '#0f172a', marginTop: 8 }}>{language === 'ta' ? 'அடுத்த அறுவடை தேதி' : 'Next harvest date'}: {formatDate(yieldNextHarvestDate)}</ThemedText>
+                                            </View>
+
+                                            <TouchableOpacity style={[styles.submitBtn, isSavingHarvest && styles.nextBtnDisabled]} disabled={isSavingHarvest} onPress={handleYieldSubmit}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                                    {isSavingHarvest ? <ActivityIndicator size="small" color="#fff" /> : null}
+                                                    <ThemedText style={styles.submitBtnText}>{isSavingHarvest ? (language === 'ta' ? 'சேமுகிறது...' : 'Saving...') : (language === 'ta' ? 'சமர்ப்பிக்கவும்' : 'Submit')}</ThemedText>
+                                                </View>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={{ marginTop: 12, alignSelf: 'center' }} onPress={() => setAddHarvestStep(1)}>
+                                                <ThemedText style={{ color: '#0f6b36', fontSize: 14, fontWeight: '600' }}>{language === 'ta' ? '« முந்தையது' : '« Back'}</ThemedText>
+                                            </TouchableOpacity>
+                                        </>
                                     )}
-
-                                    {/* Date Picker */}
-                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'தேதி' : 'Date'}</ThemedText>
-                                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
-                                        <ThemedText style={styles.inputText}>{formatDate(harvestDate)}</ThemedText>
-                                        <Ionicons name="calendar-outline" size={20} color="#64748b" />
-                                    </TouchableOpacity>
-                                    {showDatePicker && (
-                                        <DateTimePicker
-                                            value={harvestDate}
-                                            mode="date"
-                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                            onChange={handleDateChange}
-                                        />
-                                    )}
-
-                                    {/* Counts */}
-                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'பச்சை தேங்காய்' : 'Green Coconut Count'}</ThemedText>
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        value={greenCount}
-                                        onChangeText={setGreenCount}
-                                    />
-
-                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'கருப்பு தேங்காய்' : 'Black Coconut Count'}</ThemedText>
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        value={blackCount}
-                                        onChangeText={setBlackCount}
-                                    />
-
-                                    <ThemedText style={styles.inputLabel}>{language === 'ta' ? 'கொப்பரா' : 'Copra Count'}</ThemedText>
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        value={copraCount}
-                                        onChangeText={setCopraCount}
-                                    />
-
-                                    <View style={{ height: 20 }} />
-
-                                    <TouchableOpacity style={[styles.submitBtn, isSavingHarvest && styles.nextBtnDisabled]} disabled={isSavingHarvest} onPress={handleSaveHarvest}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                            {isSavingHarvest ? <ActivityIndicator size="small" color="#fff" /> : null}
-                                            <ThemedText style={styles.submitBtnText}>{isSavingHarvest ? (language === 'ta' ? 'சேமுகிறது...' : 'Saving...') : (language === 'ta' ? 'சேமி' : 'Save')}</ThemedText>
-                                        </View>
-                                    </TouchableOpacity>
                                 </ScrollView>
                             </View>
                         </View>
                     </KeyboardAvoidingView>
                 </SafeAreaView>
+            </Modal>
+
+            {/* View Harvest Detail Modal - fetches via GET /harvests/:id */}
+            <Modal visible={viewHarvestId !== null || !!viewHarvestDetail} transparent animationType="fade" onRequestClose={() => { setViewHarvestId(null); setViewHarvestDetail(null); setIsViewHarvestLoading(false); }}>
+                <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', padding: 16 }]}>
+                    <View style={[styles.modalContent, { maxHeight: '70%' }]}>
+                        <View style={styles.modalHeader}>
+                            <ThemedText style={styles.modalTitle}>{language === 'ta' ? 'அறுவடை விவரம்' : 'Harvest Detail'}</ThemedText>
+                            <TouchableOpacity onPress={() => { setViewHarvestId(null); setViewHarvestDetail(null); setIsViewHarvestLoading(false); }}>
+                                <Ionicons name="close" size={24} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+                        {isViewHarvestLoading ? (
+                            <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color="#16a34a" />
+                                <ThemedText style={{ marginTop: 12, fontSize: 14, color: '#64748b' }}>{language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}</ThemedText>
+                            </View>
+                        ) : viewHarvestDetail ? (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <ThemedText style={{ fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 12 }}>{viewHarvestDetail.land_name || (language === 'ta' ? 'பண்ணை' : 'Farm')}</ThemedText>
+                                <View style={[styles.harvestSummaryGrid, { marginBottom: 0 }]}>
+                                    <View style={styles.harvestSummaryItem}>
+                                        <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'அறுவடை தேதி' : 'Harvest date'}</ThemedText>
+                                        <ThemedText style={styles.harvestSummaryValue}>{viewHarvestDetail.harvest_date ? formatDate(viewHarvestDetail.harvest_date) : '-'}</ThemedText>
+                                    </View>
+                                    <View style={styles.harvestSummaryItem}>
+                                        <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'தேங்காய் எண்ணிக்கை' : 'No of coconut'}</ThemedText>
+                                        <ThemedText style={styles.harvestSummaryValue}>{viewHarvestDetail.no_of_coconut ?? viewHarvestDetail.green_coconut ?? '-'}</ThemedText>
+                                    </View>
+                                    <View style={styles.harvestSummaryItem}>
+                                        <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'சராசரி எடை' : 'Average weight'}</ThemedText>
+                                        <ThemedText style={styles.harvestSummaryValue}>{viewHarvestDetail.average_weight != null ? `${viewHarvestDetail.average_weight}g` : '-'}</ThemedText>
+                                    </View>
+                                    <View style={styles.harvestSummaryItem}>
+                                        <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'விலை/தேங்காய்' : 'Price/coconut'}</ThemedText>
+                                        <ThemedText style={styles.harvestSummaryValue}>{viewHarvestDetail.price_per_coconut != null && viewHarvestDetail.price_per_coconut !== '' ? `₹${viewHarvestDetail.price_per_coconut}` : '-'}</ThemedText>
+                                    </View>
+                                    <View style={[styles.harvestSummaryItem, { borderBottomWidth: 0 }]}>
+                                        <ThemedText style={styles.harvestSummaryLabel}>{language === 'ta' ? 'அடுத்த அறுவடை' : 'Next harvest'}</ThemedText>
+                                        <ThemedText style={styles.harvestSummaryValue}>{viewHarvestDetail.next_harvest ? formatDate(viewHarvestDetail.next_harvest) : '-'}</ThemedText>
+                                    </View>
+                                </View>
+                                <TouchableOpacity style={[styles.nextBtn, { marginTop: 16, backgroundColor: '#64748b' }]} onPress={() => { setViewHarvestId(null); setViewHarvestDetail(null); setIsViewHarvestLoading(false); }}>
+                                    <ThemedText style={[styles.nextBtnText, { color: '#fff' }]}>{language === 'ta' ? 'மூடு' : 'Close'}</ThemedText>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        ) : null}
+                    </View>
+                </View>
             </Modal>
 
             {/* Add Farm Modal (Popup matching attached UI) */}
@@ -2941,6 +3274,12 @@ const styles = StyleSheet.create({
     addHarvestBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
     historyTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginHorizontal: 16, marginTop: 24, marginBottom: 12 },
+    harvestSummaryCard: { marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
+    harvestSummaryFarmName: { fontSize: 16, fontWeight: '700', color: '#0f172a', flex: 1 },
+    harvestSummaryGrid: { backgroundColor: '#f8fafc', borderRadius: 10, padding: 12 },
+    harvestSummaryItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+    harvestSummaryLabel: { fontSize: 13, color: '#64748b', flex: 1 },
+    harvestSummaryValue: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
     historyCard: { marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
     historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
     historyIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f5f5f4', alignItems: 'center', justifyContent: 'center' },

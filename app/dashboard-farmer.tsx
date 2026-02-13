@@ -836,12 +836,17 @@ export default function FarmerDashboard() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.motivationModalBody}
+              contentContainerStyle={styles.motivationModalBodyContent}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+            >
               {(() => {
                 const quoteObj = homeData?.motivational_quotes?.active?.[0];
                 const quoteImage = quoteObj?.quote_image;
                 const quoteImageUri = quoteImage
-                  ? (quoteImage.startsWith('http') ? quoteImage : `${API_CONFIG.UPLOADS_URL}/${quoteImage}`)
+                  ? (quoteImage.startsWith('http') ? quoteImage : `${API_CONFIG.UPLOADS_URL}/quotes/${quoteImage}`)
                   : undefined;
                 return (
                   <View style={{ alignItems: 'center', paddingVertical: 12 }}>
@@ -1084,12 +1089,14 @@ const styles = StyleSheet.create({
 
   /* Motivation Bottom Sheet Styles */
   motivationBottomSheetOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
-  motivationBottomSheetContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '85%' },
+  motivationBottomSheetContent: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, height: '85%', flexDirection: 'column' },
   motivationBottomSheetHandle: { width: 40, height: 4, backgroundColor: '#d1d5db', borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  motivationQuoteImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#f3f4f6' },
+  motivationQuoteImage: { width: '100%', height: 150, borderRadius: 12, backgroundColor: '#f3f4f6' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', flex: 1, marginRight: 12 },
   modalBody: { marginBottom: 20 },
+  motivationModalBody: { flex: 1, marginBottom: 12, minHeight: 0 },
+  motivationModalBodyContent: { flexGrow: 1, paddingBottom: 24 },
   formField: { marginBottom: 16 },
   fieldLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
   dropdown: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#ffffff' },
