@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -26,72 +26,32 @@ export default function PinLogin() {
 
   // Helper function to get FCM push token
   const getPushToken = async (): Promise<string | null> => {
-    // On iOS, if Firebase is not working, skip token retrieval entirely
-    if (Platform.OS === 'ios') {
-      try {
-        console.log(`[${Platform.OS}] Starting FCM token retrieval...`);
-        
-        // Request notification permissions first
-        const hasPermission = await requestNotificationPermissions();
-        if (!hasPermission) {
-          console.warn(`[${Platform.OS}] ⚠️ Notification permission not granted. Skipping FCM token.`);
-          return null;
-        }
-        
-        // Get FCM token with a timeout for iOS
-        const fcmToken = await Promise.race([
-          getFCMToken(),
-          new Promise<string | null>((resolve) => 
-            setTimeout(() => {
-              console.warn(`[${Platform.OS}] ⚠️ FCM token retrieval timeout on iOS. Proceeding without token.`);
-              resolve(null);
-            }, 5000) // 5 second timeout
-          )
-        ]);
-        
-        if (fcmToken) {
-          console.log(`[${Platform.OS}] ✅ FCM token retrieved successfully`);
-          console.log(`[${Platform.OS}] Token length:`, fcmToken.length);
-          return fcmToken;
-        } else {
-          console.warn(`[${Platform.OS}] ⚠️ Failed to get FCM token. Proceeding without token.`);
-          return null;
-        }
-      } catch (error: any) {
-        const errorMessage = String(error?.message || error);
-        console.warn(`[${Platform.OS}] ⚠️ Firebase error on iOS. Proceeding without token:`, errorMessage);
-        // On iOS, always return null on error - don't block login
+    try {
+      console.log(`[${Platform.OS}] Starting FCM token retrieval...`);
+      
+      // Request notification permissions first
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        console.warn(`[${Platform.OS}] ⚠️ Notification permission not granted. Skipping FCM token.`);
         return null;
       }
-    } else {
-      // Android - normal flow
-      try {
-        console.log(`[${Platform.OS}] Starting FCM token retrieval...`);
-        
-        // Request notification permissions first
-        const hasPermission = await requestNotificationPermissions();
-        if (!hasPermission) {
-          console.warn(`[${Platform.OS}] ⚠️ Notification permission not granted. Skipping FCM token.`);
-          return null;
-        }
-        
-        // Get FCM token
-        const fcmToken = await getFCMToken();
-        
-        if (fcmToken) {
-          console.log(`[${Platform.OS}] ✅ FCM token retrieved successfully`);
-          console.log(`[${Platform.OS}] Token length:`, fcmToken.length);
-          return fcmToken;
-        } else {
-          console.warn(`[${Platform.OS}] ⚠️ Failed to get FCM token`);
-          return null;
-        }
-      } catch (error: any) {
-        console.error(`[${Platform.OS}] ❌ Error getting FCM token:`, error);
-        console.error(`[${Platform.OS}] Error message:`, error?.message || 'Unknown error');
-        // Return null gracefully - don't block login if FCM token fails
+      
+      // Get FCM token
+      const fcmToken = await getFCMToken();
+      
+      if (fcmToken) {
+        console.log(`[${Platform.OS}] ✅ FCM token retrieved successfully`);
+        console.log(`[${Platform.OS}] Token length:`, fcmToken.length);
+        return fcmToken;
+      } else {
+        console.warn(`[${Platform.OS}] ⚠️ Failed to get FCM token`);
         return null;
       }
+    } catch (error: any) {
+      console.error(`[${Platform.OS}] ❌ Error getting FCM token:`, error);
+      console.error(`[${Platform.OS}] Error message:`, error?.message || 'Unknown error');
+      // Return null gracefully - don't block login if FCM token fails
+      return null;
     }
   };
 

@@ -1,4 +1,4 @@
-package com.anonymous.NAAM
+package com.naam.farmers
 
 import android.app.Application
 import android.content.res.Configuration

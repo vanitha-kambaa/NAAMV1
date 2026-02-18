@@ -1,4 +1,4 @@
-package com.anonymous.NAAM
+package com.naam.farmers
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

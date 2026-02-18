@@ -144,38 +144,49 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     // needed to return the correct URL for expo-dev-client.
-    bridge.bundleURL ?? bundleURL()
+    if let bridgeURL = bridge.bundleURL {
+      return bridgeURL
+    }
+    return bundleURL()
   }
 
   override func bundleURL() -> URL? {
     let bundleProvider = RCTBundleURLProvider.sharedSettings()
     
-    // Try the standard Expo entry point first
+    #if DEBUG
+    // In DEBUG mode, always try to connect to Metro bundler
+    // Try the standard Expo virtual metro entry first (for expo-dev-client)
     if let metroURL = bundleProvider.jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry") {
       print("✅ Using Metro bundler URL: \(metroURL.absoluteString)")
       return metroURL
     }
     
-    // Try alternative entry points
-    if let altURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
-      print("✅ Using alternative Metro URL: \(altURL.absoluteString)")
-      return altURL
+    // Try index as standard entry point (bundle provider auto-detects IP/port)
+    if let indexURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
+      print("✅ Using index Metro URL: \(indexURL.absoluteString)")
+      return indexURL
     }
     
-    // Fallback to embedded bundle if Metro is not available
+    // Last resort: Use bundle provider's default behavior
+    // This will try to auto-detect Metro's IP and port
+    bundleProvider.resetToDefaults()
+    if let defaultURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
+      print("✅ Using default Metro URL: \(defaultURL.absoluteString)")
+      return defaultURL
+    }
+    
+    print("❌ DEBUG mode: Could not determine Metro bundler URL")
+    print("   Make sure Metro is running:")
+    print("     Run: npx expo start")
+    print("   Or rebuild the app:")
+    print("     Run: npx expo run:ios --device")
+    #else
+    // In RELEASE mode, use embedded bundle
     if let embeddedBundle = Bundle.main.url(forResource: "main", withExtension: "jsbundle") {
       print("✅ Using embedded bundle")
       return embeddedBundle
     }
     
-    // Last resort: Check if we're in Debug mode and Metro should be running
-    #if DEBUG
-    print("❌ DEBUG mode: No Metro bundler found and no embedded bundle")
-    print("   Solution 1: Start Metro and restart app")
-    print("     Run: npx expo start")
-    print("   Solution 2: Rebuild with Metro")
-    print("     Run: npx expo run:ios --device")
-    #else
     print("❌ RELEASE mode: No embedded bundle found")
     print("   Rebuild with embedded bundle:")
     print("     Run: npx expo run:ios --device --configuration Release")

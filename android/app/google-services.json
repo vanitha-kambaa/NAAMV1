@@ -8,9 +8,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:74998480991:android:9ba907eaef1fc633fb5bea",
+        "mobilesdk_app_id": "1:74998480991:android:d12f5b804dec5c86fb5bea",
         "android_client_info": {
-          "package_name": "com.anonymous.NAAM"
+          "package_name": "com.naam.farmers"
         }
       },
       "oauth_client": [],

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		G1O2O3G4L5E6S7E8R9V0I1C3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = G1O2O3G4L5E6S7E8R9V0I1C2 /* GoogleService-Info.plist */; };
 		91AEEADA15A222835849863C /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F513A36E5B2F7AE9553C3EA7 /* ExpoModulesProvider.swift */; };
 		AE8F4319B91359798FABBA7D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48948E59A95DA5357B09FD0A /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -29,7 +30,9 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = NAAM/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* NAAM-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "NAAM-Bridging-Header.h"; path = "NAAM/NAAM-Bridging-Header.h"; sourceTree = "<group>"; };
 		F2F3446D17689355B814EFB6 /* Pods-NAAM.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-NAAM.debug.xcconfig"; path = "Target Support Files/Pods-NAAM/Pods-NAAM.debug.xcconfig"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6G7H8I9J0K1L2 /* NAAM.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = NAAM.entitlements; path = NAAM/NAAM.entitlements; sourceTree = "<group>"; };
 		F513A36E5B2F7AE9553C3EA7 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-NAAM/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		G1O2O3G4L5E6S7E8R9V0I1C2 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "NAAM/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +55,8 @@
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
+				A1B2C3D4E5F6G7H8I9J0K1L2 /* NAAM.entitlements */,
+				G1O2O3G4L5E6S7E8R9V0I1C2 /* GoogleService-Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				48948E59A95DA5357B09FD0A /* PrivacyInfo.xcprivacy */,
 			);
@@ -200,6 +205,7 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				AE8F4319B91359798FABBA7D /* PrivacyInfo.xcprivacy in Resources */,
+				G1O2O3G4L5E6S7E8R9V0I1C3 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -386,6 +392,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = NAAM/NAAM.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -408,7 +415,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.NAAM;
+				PRODUCT_BUNDLE_IDENTIFIER = com.naam.farmers;
 				PRODUCT_NAME = NAAM;
 				SWIFT_OBJC_BRIDGING_HEADER = "NAAM/NAAM-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -423,6 +430,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = NAAM/NAAM.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -440,7 +448,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.NAAM;
+				PRODUCT_BUNDLE_IDENTIFIER = com.naam.farmers;
 				PRODUCT_NAME = NAAM;
 				SWIFT_OBJC_BRIDGING_HEADER = "NAAM/NAAM-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

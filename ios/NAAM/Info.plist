@@ -14,6 +14,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Naam Farmers</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,7 +31,7 @@
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<false/>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 		<key>NSExceptionDomains</key>
@@ -42,6 +44,33 @@
 				<true/>
 				<key>NSExceptionRequiresForwardSecrecy</key>
 				<false/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.0</string>
+			</dict>
+			<key>192.168.1.9</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.0</string>
+			</dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>127.0.0.1</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
 			</dict>
 		</dict>
 	</dict>
@@ -53,6 +82,12 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We use your location to show nearby services and improve your experience.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to capture photos for uploads.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to upload images.</string>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleDefault</string>
 	<key>UISupportedInterfaceOrientations</key>

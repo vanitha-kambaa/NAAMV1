@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "NAAM",
-    "slug": "naam",
+    "name": "Naam Farmers",
+    "slug": "naam-farmers",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "naam",
+    "scheme": "naam-farmers",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.NAAM",
+      "bundleIdentifier": "com.naam.farmers",
       "googleServicesFile": "./ios/NAAM/GoogleService-Info.plist"
     },
     "android": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.NAAM",
+      "package": "com.naam.farmers",
       "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
