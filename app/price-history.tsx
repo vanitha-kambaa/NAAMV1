@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
@@ -311,7 +310,6 @@ export default function PriceHistory() {
           </>
         )}
       </View>
-      <FarmerBottomNav />
     </SafeAreaView>
   );
 }

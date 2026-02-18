@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -109,9 +108,6 @@ export default function FarmerDashboard() {
           <ThemedText style={styles.noteText}>{language === 'ta' ? 'உங்கள் விவசாயம் தயாரா என்பதை சரிபார்க்க உதவிகள் உள்ளன.' : 'Quick tips to prepare your farm are available.'}</ThemedText>
         </View>
       </ScrollView>
-
-      {/* Bottom nav (shared) */}
-      <FarmerBottomNav />
     </SafeAreaView>
   );
 }

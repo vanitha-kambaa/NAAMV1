@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { RemoteImage } from '@/components/RemoteImage';
 import { useSideMenu } from '@/components/SideMenu';
@@ -520,7 +519,7 @@ export default function Profile() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ title: t('profile') || 'Profile', headerShown: false }} />
       {/* Top bar */}
       <View style={styles.topAppBar}>
@@ -855,7 +854,6 @@ export default function Profile() {
           </View>
         </ScrollView>
       </View >
-      <FarmerBottomNav />
     </SafeAreaView >
   );
 }

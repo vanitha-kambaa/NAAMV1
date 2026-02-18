@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -388,7 +388,7 @@ export default function NewRegistration() {
   // Handle complete button click - check selected type's reg_fees_enable
   const handleCompleteClick = async () => {
     if (!selectedFeeType) {
-      Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'சேர விரும்பும் வகையை தேர்ந்தெடுக்கவும்' : 'Please select how you would like to join');
+      Alert.alert(language === 'ta' ? 'பிழை' : 'Error', language === 'ta' ? 'தயவு செய்து பயனர் வகையை தேர்ந்தெடுக்கவும்' : 'Please select user type');
       return;
     }
     try {
@@ -740,33 +740,40 @@ export default function NewRegistration() {
       console.log('registerUser response', { status: res.status, statusText: res.statusText, body: json });
 
       if (json?.status === 'success') {
-        // The register-farmer response returns farmer object and token
-        const farmer = json.data?.farmer ?? json.data?.user ?? null;
-        const token = json.data?.token ?? json.data?.auth_token ?? json.data?.token_id ?? null;
-        const userId = farmer?.id || null;
+        const data = json;
+        // The register-farmer response returns farmer object and token (use already-parsed json; body can only be read once)
+        const farmer = data.data?.farmer ?? data.data?.user ?? null;
+        const prefLang = data.data?.preferred_language ?? farmer?.preferred_language ?? '';
+        const lang = String(prefLang).toLowerCase();
+        if (lang === 'en' || lang === 'english') setLanguage('en');
+        else if (lang === 'ta' || lang === 'tamil') setLanguage('ta');
+        const userId = data.data?.id ?? farmer?.id ?? data.data?.farmer?.id ?? data.data?.user?.id ?? null;
+        // store token and user info
+        const token = data.data?.token ?? data.data?.auth_token ?? data.data?.token_id ?? null;
+        if (token) await AsyncStorage.setItem('authToken', String(token));
+        let roleName = 'farmer';
+        if (data.data?.farmer) {
+          await AsyncStorage.setItem('userId', String(data.data.farmer.id));
+          roleName = data.data.farmer.role_id === 2 ? 'farmer' : data.data.farmer.role_id === 3 ? 'investor' : data.data.farmer.role_id === 4 ? 'serviceProvider' : 'farmer';
+          await AsyncStorage.setItem('userRole', roleName);
+          await AsyncStorage.setItem('userData', JSON.stringify(data.data.farmer));
+          if (data.data.farmer.farmer != null) await AsyncStorage.setItem('UserInfo', String(data.data.farmer.farmer));
+        } else if (data.data?.user) {
+          await AsyncStorage.setItem('userId', String(data.data.user.id));
+          roleName = data.data.user.role_id === 2 ? 'farmer' : data.data.user.role_id === 3 ? 'investor' : data.data.user.role_id === 4 ? 'serviceProvider' : 'farmer';
+          await AsyncStorage.setItem('userRole', roleName);
+          await AsyncStorage.setItem('userData', JSON.stringify(data.data.user));
+          if (data.data.user.farmer != null) await AsyncStorage.setItem('UserInfo', String(data.data.user.farmer));
+        } else if (userId) {
+          await AsyncStorage.setItem('userId', String(userId));
+        }
+        // Store profile_images if available
+        if (data.data?.profile_images && Array.isArray(data.data.profile_images)) {
+          await AsyncStorage.setItem('profile_images', JSON.stringify(data.data.profile_images));
+        }
 
         Alert.alert(language === 'ta' ? 'வெற்றி' : 'Success', language === 'ta' ? 'பதிவு வெற்றி' : 'Registration successful');
 
-        // Store auth token and user details similar to login flows
-        try {
-          if (token) {
-            await AsyncStorage.setItem('authToken', String(token));
-          }
-          if (userId) {
-            await AsyncStorage.setItem('userId', String(userId));
-          }
-          // map role
-          const roleName = farmer?.role_id ? (farmer.role_id === 2 ? 'farmer' : farmer.role_id === 3 ? 'investor' : farmer.role_id === 4 ? 'serviceProvider' : 'farmer') : 'farmer';
-          await AsyncStorage.setItem('userRole', roleName);
-          if (farmer) {
-            await AsyncStorage.setItem('userData', JSON.stringify(farmer));
-          }
-        } catch (storageErr) {
-          console.warn('registerUser: failed to store auth data', storageErr);
-        }
-
-        // Return userId for payment status update
-        // Navigation will be handled by the caller after payment update
         console.log('registerUser returning userId:', userId);
         return userId;
       } else {
@@ -789,16 +796,30 @@ export default function NewRegistration() {
 
   useEffect(() => {
     if (showFeeTypeStep && feeTypes.length === 0) fetchFeeSettings();
-  }, [showFeeTypeStep]); 
+  }, [showFeeTypeStep]);
+
+  // When only one user/fee type is available, select it by default
+  useEffect(() => {
+    if (feeTypes.length === 1 && !selectedFeeType) {
+      setSelectedFeeType(feeTypes[0]);
+    }
+  }, [feeTypes]); 
 
   return (
     <>
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
       <ScrollView
         style={[styles.container, { backgroundColor: isDarkMode ? '#061025' : '#ecfdf5' }]}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-start', paddingTop: 200, paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View style={styles.topRow}>
           <TouchableOpacity style={styles.back} onPress={() => {
@@ -1021,9 +1042,15 @@ export default function NewRegistration() {
             <ThemedText style={[styles.title, { fontSize: 24, marginBottom: 12 }]}>{language === 'ta' ? 'நீங்கள் எவ்வாறு சேர விரும்புகிறீர்கள்?' : 'Would you like to join as'}</ThemedText>
 
             {feeLoading ? (
-              <ThemedText style={{ marginTop: 16, color: '#6b7280', textAlign: 'center' }}>{language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}</ThemedText>
+              <View style={{ marginTop: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color="#0bb24c" />
+                <ThemedText style={{ color: '#6b7280', textAlign: 'center', marginLeft: 8 }}>{language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}</ThemedText>
+              </View>
             ) : (
               <View style={{ marginTop: 16 }}>
+                {!selectedFeeType && feeTypes.length > 1 && (
+                  <ThemedText style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{language === 'ta' ? 'தயவு செய்து பயனர் வகையை தேர்ந்தெடுக்கவும்' : 'Please select user type'}</ThemedText>
+                )}
                 {feeTypes.map((ft) => (
                   <TouchableOpacity
                     key={ft.id}
@@ -1048,12 +1075,18 @@ export default function NewRegistration() {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.finishBtn} onPress={() => { handleCompleteClick(); }} disabled={registering || feeLoading || paymentProcessing || !selectedFeeType}>
-                <ThemedText style={styles.ctaText}>
-                  {feeLoading ? (language === 'ta' ? 'சரிபார்க்கிறது...' : 'Checking...') :
-                   paymentProcessing ? (language === 'ta' ? 'செயலாக்கம்...' : 'Processing...') :
-                   registering ? (language === 'ta' ? 'சேமிக்கிறது' : 'Registering...') :
-                   (language === 'ta' ? 'தொடரவும்' : 'Continue')}
-                </ThemedText>
+                {(registering || feeLoading || paymentProcessing) ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <ThemedText style={[styles.ctaText, { marginLeft: 8 }]}>
+                      {feeLoading ? (language === 'ta' ? 'சரிபார்க்கிறது...' : 'Checking...') :
+                       paymentProcessing ? (language === 'ta' ? 'செயலாக்கம்...' : 'Processing...') :
+                       (language === 'ta' ? 'சேமிக்கிறது' : 'Registering...')}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.ctaText}>{language === 'ta' ? 'தொடரவும்' : 'Continue'}</ThemedText>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1117,7 +1150,10 @@ export default function NewRegistration() {
                     autoFocus={true}
                   />
                   {statesLoading ? (
-                    <ThemedText style={{ padding: 12 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                    <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                      <ActivityIndicator size="small" color="#0bb24c" />
+                      <ThemedText style={{ marginLeft: 8 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                    </View>
                   ) : (
                     <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
                       {statesList
@@ -1170,7 +1206,10 @@ export default function NewRegistration() {
                         autoFocus={true}
                       />
                       {districtsLoading ? (
-                        <ThemedText style={{ padding: 12 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                        <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                          <ActivityIndicator size="small" color="#0bb24c" />
+                          <ThemedText style={{ marginLeft: 8 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                        </View>
                       ) : (
                         <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
                           {districtsList
@@ -1224,7 +1263,10 @@ export default function NewRegistration() {
                             autoFocus={true}
                           />
                           {subdistrictsLoading ? (
-                            <ThemedText style={{ padding: 12 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                              <ActivityIndicator size="small" color="#0bb24c" />
+                              <ThemedText style={{ marginLeft: 8 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            </View>
                           ) : (
                             <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
                               {subdistrictsList
@@ -1280,7 +1322,10 @@ export default function NewRegistration() {
                             autoFocus={true}
                           />
                           {panchayatsLoading ? (
-                            <ThemedText style={{ padding: 12 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                              <ActivityIndicator size="small" color="#0bb24c" />
+                              <ThemedText style={{ marginLeft: 8 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            </View>
                           ) : (
                             <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
                               {panchayatsList
@@ -1336,7 +1381,10 @@ export default function NewRegistration() {
                             autoFocus={true}
                           />
                           {villagesLoading ? (
-                            <ThemedText style={{ padding: 12 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                              <ActivityIndicator size="small" color="#0bb24c" />
+                              <ThemedText style={{ marginLeft: 8 }}>{language === 'ta' ? 'காத்திருக்கவும்...' : 'Loading...'}</ThemedText>
+                            </View>
                           ) : (
                             <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
                               {villagesList
@@ -1425,6 +1473,7 @@ export default function NewRegistration() {
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Fee Confirmation Modal */}
       <Modal

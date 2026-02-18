@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
 import { API_CONFIG } from '@/config/api';
@@ -188,8 +187,6 @@ export default function NotificationsScreen() {
           </>
         )}
       </ScrollView>
-
-      <FarmerBottomNav />
 
       {/* View notification modal */}
       <Modal
