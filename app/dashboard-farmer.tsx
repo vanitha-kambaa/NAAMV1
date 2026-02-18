@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
@@ -396,6 +395,13 @@ export default function FarmerDashboard() {
       )}
 
       <ScrollView contentContainerStyle={styles.content}>
+        {loadingHome && !homeData ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#0f6b36" />
+            <ThemedText style={styles.loadingText}>{language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}</ThemedText>
+          </View>
+        ) : (
+        <>
         {/* Price card */}
         <View style={styles.priceCardWrap}>
           <View style={styles.priceCard}>
@@ -648,7 +654,8 @@ export default function FarmerDashboard() {
 
 
         </View>
-
+        </>
+        )}
       </ScrollView>
 
       {/* Loan Application Modal */}
@@ -889,9 +896,6 @@ export default function FarmerDashboard() {
           </Pressable>
         </Pressable>
       </Modal>
-
-      {/* Bottom nav (shared) */}
-      <FarmerBottomNav />
     </SafeAreaView>
   );
 }
@@ -930,6 +934,8 @@ const styles = StyleSheet.create({
   infoStripAction: { backgroundColor: '#ffe6b3', paddingHorizontal: isSmallScreen ? 8 : 10, paddingVertical: isSmallScreen ? 5 : 6, borderRadius: 8 },
   infoStripActionText: { color: '#8a6b00', fontWeight: '700', fontSize: isSmallScreen ? 11 : 12 },
   content: { paddingHorizontal: isSmallScreen ? 12 : 16, paddingVertical: isSmallScreen ? 12 : 16, alignItems: 'center', paddingBottom: 10 },
+  loadingWrap: { paddingVertical: 48, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { marginTop: 12, fontSize: 15, color: '#4b5563' },
   priceCardWrap: { alignItems: 'center', width: '100%' },
   priceCard: { width: '100%', maxWidth: 520, backgroundColor: '#0bb24c', borderRadius: isSmallScreen ? 10 : 12, padding: isSmallScreen ? 12 : 16, elevation: 6 },
   priceCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: isSmallScreen ? 10 : 12, flexWrap: 'wrap' },

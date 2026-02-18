@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
@@ -84,7 +83,15 @@ export default function HarvestScreen() {
 
     // Validation helpers for Add-Farm steps
     const isStep1Valid = newFarmName.trim().length > 0;
-    const isStep2Valid = (!!latitude && !!longitude) || (!!selectedState && !!selectedDistrict && !!selectedVillage);
+    // Step 2: allow moving to step 3 if any location type and its value is filled
+    const isStep2Valid =
+        (!!latitude && !!longitude) ||
+        (pincode.trim().length === 6) ||
+        (selectedState.trim().length > 0) ||
+        (selectedDistrict.trim().length > 0) ||
+        (selectedTaluk.trim().length > 0) ||
+        (selectedPanchayat.trim().length > 0) ||
+        (selectedVillage.trim().length > 0);
     const isStep3Valid = !!ownershipType && landArea.trim().length > 0 && !!landUnit;
     const isStep4Valid = treeCount.trim().length > 0 && !!coconutType && avgTreeAge.trim().length > 0 && plantingType.trim().length > 0 && expectedYield.trim().length > 0;
 
@@ -1462,7 +1469,8 @@ export default function HarvestScreen() {
                         const nextHarvest = farm.last_harvest?.next_harvest || null;
                         const isActive = farm.coconut_status === 1 || farm.land_status === 1;
                         const nextHarvestExceeded = nextHarvest ? new Date() > new Date(nextHarvest) : false;
-                        const showHarvestButton = !farm.last_harvest || nextHarvestExceeded;
+                        // Show Add Harvest when there is no next harvest date, or when next harvest date has passed
+                        const showHarvestButton = !nextHarvest || nextHarvestExceeded;
                         const isUpdateYield = !!farm.last_harvest && nextHarvestExceeded;
 
                         return (
@@ -1559,7 +1567,7 @@ export default function HarvestScreen() {
                                         {showHarvestButton && (
                                         <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                                             <TouchableOpacity style={[styles.nextBtn, { flex: 1, paddingHorizontal: 12, minHeight: 44 }]} onPress={() => { setEditingHarvestId(null); setSelectedFarm(farm); setIsModalOpen(true); }}>
-                                                <ThemedText style={[styles.nextBtnText, { textAlign: 'center', fontSize: 14 }]} numberOfLines={1}>{isUpdateYield ? (language === 'ta' ? 'விளைச்சலை புதுப்பிக்கு' : 'Update Yield') : (language === 'ta' ? 'அறுவடைக்கு சேர்க்க' : 'Add Harvest')}</ThemedText>
+                                                <ThemedText style={[styles.nextBtnText, { textAlign: 'center', fontSize: 14 }]} numberOfLines={1}>{isUpdateYield ? (language === 'ta' ? 'விளைச்சலை புதுப்பி' : 'Update Yield') : (language === 'ta' ? 'அறுவடை சேர்க்க' : 'Add Harvest')}</ThemedText>
                                             </TouchableOpacity>
                                         </View>
                                         )}
@@ -1817,7 +1825,7 @@ export default function HarvestScreen() {
 
                                             <View style={{ height: 20 }} />
                                             <TouchableOpacity style={[styles.nextBtn, { backgroundColor: '#0f6b36' }]} onPress={handleYieldUpdate}>
-                                                <ThemedText style={[styles.nextBtnText, { color: '#fff' }]}>{language === 'ta' ? 'புதுப்பிக்கு' : 'UPDATE'}</ThemedText>
+                                                <ThemedText style={[styles.nextBtnText, { color: '#fff' }]}>{language === 'ta' ? 'சேமி' : 'UPDATE'}</ThemedText>
                                             </TouchableOpacity>
                                         </>
                                     ) : (
@@ -2021,10 +2029,12 @@ export default function HarvestScreen() {
                                                                     setLatitude(latitude.toString());
                                                                     setLongitude(longitude.toString());
                                                                     await processLocationFromCoords(latitude, longitude);
-                                                                    setAddFarmStep(3);
                                                                 }
+                                                                // Pincode is filled (valid 6 digits) — always move to step 3
+                                                                setAddFarmStep(3);
                                                             } catch (err) {
                                                                 console.log('Geocoding pincode failed', err);
+                                                                setAddFarmStep(3);
                                                             }
                                                             setIsGettingLocation(false);
                                                         }}
@@ -2666,7 +2676,7 @@ export default function HarvestScreen() {
 
                                             <View style={styles.summaryRow}>
                                                 <ThemedText style={styles.summaryLabel}>{language === 'ta' ? 'தேங்காய் வகை:' : 'Coconut Type:'}</ThemedText>
-                                                <ThemedText style={styles.summaryValue}>{coconutType === 'local' ? (language === 'ta' ? 'நாட்டு' : 'Local') : coconutType === 'hybrid' ? (language === 'ta' ? 'கலப்பின' : 'Hybrid') : coconutType === 'other' ? (language === 'ta' ? 'மற்றவை' : 'Other') : ''}</ThemedText>
+                                                <ThemedText style={styles.summaryValue}>{coconutType === 'country' ? (language === 'ta' ? 'நாட்டு' : 'Country') : coconutType === 'hybrid' ? (language === 'ta' ? 'கலப்பின' : 'Hybrid') : coconutType === 'mixed' ? (language === 'ta' ? 'கலப்பு' : 'Mixed') : ''}</ThemedText>
                                             </View>
 
                                             <View style={styles.summaryRow}>
@@ -3177,8 +3187,6 @@ export default function HarvestScreen() {
                     </View>
                 </SafeAreaView>
             </Modal >
-
-            <FarmerBottomNav />
         </SafeAreaView >
     );
 }

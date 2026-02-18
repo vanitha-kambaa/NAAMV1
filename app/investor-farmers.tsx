@@ -1,4 +1,3 @@
-import FarmerBottomNav from '@/components/farmer-bottom-nav';
 import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
@@ -51,7 +50,7 @@ export default function LeaderScreen() {
   }; 
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Top Standard Header */}
@@ -176,8 +175,6 @@ export default function LeaderScreen() {
         </View>
 
       </ScrollView>
-
-      <FarmerBottomNav />
     </SafeAreaView>
   );
 }
