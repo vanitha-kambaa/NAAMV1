@@ -1062,7 +1062,7 @@ export default function NewRegistration() {
                   >
                     <ThemedText style={[styles.feeTypeOptionText, selectedFeeType?.id === ft.id && styles.feeTypeOptionTextSelected]}>
                       {ft.type.charAt(0).toUpperCase() + ft.type.slice(1)}
-                      {ft.reg_fees_enable === 1 && parseFloat(ft.reg_fees || '0') > 0 ? ` - ₹${ft.reg_fees}` : ` (${language === 'ta' ? 'இலவசம்' : 'Free'})`}
+                      {ft.reg_fees_enable === 1 && parseFloat(ft.reg_fees || '0') > 0 ? ` - ₹${ft.reg_fees}` : ``}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}
