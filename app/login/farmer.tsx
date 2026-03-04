@@ -5,7 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getFCMToken, requestNotificationPermissions } from '@/services/fcm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
@@ -78,17 +78,11 @@ export default function FarmerLogin() {
       });
       const data = await response.json();
 
-      // API may return { status, message, data: { mobile_no, otp } }
-      const otpStr = data?.data?.otp ?? data?.otp; // be defensive
-
-      if (response.ok && otpStr) {
-        // Prefill OTP digits for testing
-        const digits = String(otpStr).padEnd(6, '0').slice(0, 6).split('');
-        setOtpDigits(digits);
-        setOtp(digits.join(''));
+      if (response.ok) {
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtp('');
         setOtpSent(true);
-        setSecondsRemaining(30); // start countdown (30s)
-        // focus first input
+        setSecondsRemaining(30);
         setTimeout(() => digitRefs.current[0]?.focus(), 200);
       } else {
         Alert.alert(t('error'), data?.message || 'Failed to send OTP');

@@ -34,10 +34,30 @@ public class AppDelegate: ExpoAppDelegate {
 
 #if os(iOS) || os(tvOS)
     window = UIWindow(frame: UIScreen.main.bounds)
+    #if DEBUG && !targetEnvironment(simulator)
+    // On first launch, iOS shows Local Network permission when we first hit the Metro URL.
+    // Trigger the permission dialog with a preflight (long timeout), then delay RN start so user can tap "Allow".
+    if let metroURL = delegate.bundleURL(), let host = metroURL.host, host != "localhost" {
+      let config = URLSessionConfiguration.default
+      config.timeoutIntervalForRequest = 30
+      config.timeoutIntervalForResource = 30
+      let session = URLSession(configuration: config)
+      let task = session.dataTask(with: metroURL) { _, _, _ in }
+      task.resume()
+      let win = window!
+      // Give user time to tap "Allow" on Local Network dialog (8s); then start RN so bundle load can succeed.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+        factory.startReactNative(withModuleName: "main", in: win, launchOptions: launchOptions)
+      }
+    } else {
+      factory.startReactNative(withModuleName: "main", in: window!, launchOptions: launchOptions)
+    }
+    #else
     factory.startReactNative(
       withModuleName: "main",
       in: window,
       launchOptions: launchOptions)
+    #endif
 #endif
 
     return result
@@ -151,37 +171,43 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   }
 
   override func bundleURL() -> URL? {
+    #if DEBUG
+    // DEBUG: connect to Metro bundler (development only; not used for App Store builds)
     let bundleProvider = RCTBundleURLProvider.sharedSettings()
     
-    #if DEBUG
-    // In DEBUG mode, always try to connect to Metro bundler
-    // Try the standard Expo virtual metro entry first (for expo-dev-client)
-    if let metroURL = bundleProvider.jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry") {
-      print("✅ Using Metro bundler URL: \(metroURL.absoluteString)")
-      return metroURL
+    // Use "index" as bundle root so Metro resolves ./index.js, which imports expo-router/entry (avoids ./expo-router/entry path resolution)
+    #if targetEnvironment(simulator)
+    // Simulator: use bundleProvider (localhost works)
+    let bundleRoots = [".expo/.virtual-metro-entry", "index", "expo-router/entry"]
+    for root in bundleRoots {
+      if let metroURL = bundleProvider.jsBundleURL(forBundleRoot: root) {
+        print("✅ Using Metro bundler URL: \(metroURL.absoluteString)")
+        return metroURL
+      }
     }
-    
-    // Try index as standard entry point (bundle provider auto-detects IP/port)
-    if let indexURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
-      print("✅ Using index Metro URL: \(indexURL.absoluteString)")
-      return indexURL
+    if let fallback = URL(string: "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false") {
+      return fallback
     }
-    
-    // Last resort: Use bundle provider's default behavior
-    // This will try to auto-detect Metro's IP and port
-    bundleProvider.resetToDefaults()
-    if let defaultURL = bundleProvider.jsBundleURL(forBundleRoot: "index") {
-      print("✅ Using default Metro URL: \(defaultURL.absoluteString)")
-      return defaultURL
-    }
-    
-    print("❌ DEBUG mode: Could not determine Metro bundler URL")
-    print("   Make sure Metro is running:")
-    print("     Run: npx expo start")
-    print("   Or rebuild the app:")
-    print("     Run: npx expo run:ios --device")
     #else
-    // In RELEASE mode, use embedded bundle
+    // Physical device: always use Mac IP from Info.plist (injected at build time) so we hit the correct host
+    if let plistHost = Bundle.main.object(forInfoDictionaryKey: "RCTMetroHost") as? String, !plistHost.isEmpty,
+       let url = URL(string: "http://\(plistHost):8081/index.bundle?platform=ios&dev=true&minify=false") {
+      print("✅ Using RCTMetroHost from Info.plist: \(plistHost)")
+      return url
+    }
+    // Fallback: try bundleProvider in case host was set via dev menu
+    let bundleRoots = [".expo/.virtual-metro-entry", "index", "expo-router/entry"]
+    for root in bundleRoots {
+      if let metroURL = bundleProvider.jsBundleURL(forBundleRoot: root), let host = metroURL.host, host != "localhost" {
+        print("✅ Using Metro bundler URL: \(metroURL.absoluteString)")
+        return metroURL
+      }
+    }
+    print("❌ Physical device: RCTMetroHost not set. Rebuild with: npx expo run:ios. If URL is set but request times out: (1) Run Metro with: npm run start:device (2) Allow Local Network when iOS prompts (3) Ensure iPhone and Mac are on same Wi‑Fi (4) macOS: allow Node in Firewall if needed.")
+    #endif
+    return nil
+    #else
+    // RELEASE (App Store): use embedded bundle only — never connects to any dev server
     if let embeddedBundle = Bundle.main.url(forResource: "main", withExtension: "jsbundle") {
       print("✅ Using embedded bundle")
       return embeddedBundle

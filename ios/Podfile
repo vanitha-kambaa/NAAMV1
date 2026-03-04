@@ -26,6 +26,10 @@ target 'NAAM' do
   
   use_expo_modules!
 
+  # Pin razorpay-pod to 1.4.7 - workaround for Hermes/New Arch crash (EXC_BAD_ACCESS)
+  # See: https://github.com/razorpay/react-native-razorpay/issues/515
+  pod 'razorpay-pod', '1.4.7'
+
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else

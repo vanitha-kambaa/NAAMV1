@@ -153,6 +153,7 @@
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				6D0B94DFA6B6E61945DDE24D /* [CP] Embed Pods Frameworks */,
 				3C01515EADEC2CEFBB09907E /* [CP-User] [RNFB] Core Configuration */,
+				RCTMETRO001A680F5B00A75B9A /* [RN] Set RCTMetroHost for physical device */,
 			);
 			buildRules = (
 			);
@@ -369,6 +370,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-NAAM/Pods-NAAM-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		RCTMETRO001A680F5B00A75B9A /* [RN] Set RCTMetroHost for physical device */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "[RN] Set RCTMetroHost for physical device";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Inject Mac IP into built app's Info.plist for physical device Metro connection\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  # Prefer default route interface, then en0..en3 (Wi‑Fi often en0, ethernet en1)\n  DEFAULT_IF=$(route -n get default 2>/dev/null | awk '/interface: / {print $2}')\n  if [ -n \"$DEFAULT_IF\" ]; then\n    IP=$(ipconfig getifaddr \"$DEFAULT_IF\")\n  fi\n  if [ -z \"$IP\" ]; then\n    for iface in en0 en1 en2 en3; do\n      IP=$(ipconfig getifaddr $iface)\n      [ -n \"$IP\" ] && break\n    done\n  fi\n  [ -z \"$IP\" ] && IP=localhost\n  PLIST=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Info.plist\"\n  if [ -f \"$PLIST\" ] && [ -n \"$IP\" ]; then\n    /usr/libexec/PlistBuddy -c \"Set :RCTMetroHost $IP\" \"$PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :RCTMetroHost string $IP\" \"$PLIST\" 2>/dev/null\n    echo \"Metro host set to $IP (use same Wi‑Fi as Mac and run: npm run start:device)\"\n  fi\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

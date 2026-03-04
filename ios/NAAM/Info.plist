@@ -40,8 +40,11 @@
 	<true/>
 
 	<!-- Allow ONLY your production server -->
+	<!-- NSAllowsLocalNetworking: required for Metro bundler on physical device (dev only) -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>65.0.100.65</key>
@@ -59,6 +62,9 @@
 	<!-- React Native -->
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<!-- For physical device dev: set to your Mac's IP (e.g. 192.168.1.100) so Metro can connect -->
+	<key>RCTMetroHost</key>
+	<string></string>
 
 	<!-- Launch Screen -->
 	<key>UILaunchStoryboardName</key>
@@ -85,6 +91,14 @@
 	<!-- Location Permission -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to show nearby services and improve your experience.</string>
+
+	<!-- Local Network Permission (required for Metro bundler on physical device during dev) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Naam Farmers needs local network access to connect to the development server on your computer when testing the app.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 
 	<!-- Status Bar -->
 	<key>UIStatusBarStyle</key>
