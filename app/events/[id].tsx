@@ -5,7 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -182,7 +182,7 @@ export default function EventDetail() {
                 <Ionicons name="arrow-back" size={22} color="#fff" />
               </TouchableOpacity>
 
-              <RemoteImage uri={data.image_url && data.image_url.startsWith('http') ? data.image_url : (data.image_url ? `${API_CONFIG.UPLOADS_URL}/news/${data.image_url}` : undefined)} style={styles.heroImage} resizeMode="cover" />
+              <RemoteImage uri={data.image_url && data.image_url.startsWith('http') ? data.image_url : (data.image_url ? `${API_CONFIG.UPLOADS_URL}/${String(data.type ?? '').toLowerCase().includes('news') ? 'events' : 'news'}/${data.image_url}` : undefined)} style={styles.heroImage} resizeMode="cover" />
               <View style={styles.typePill}><ThemedText style={styles.typePillText}>{language === 'ta' ? (data.type_tamil ?? data.type ?? '') : (data.type ?? '')}</ThemedText></View>
             </View>
 

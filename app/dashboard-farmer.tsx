@@ -7,7 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -613,7 +613,9 @@ export default function FarmerDashboard() {
                     key={`news-img-${ev.id}-${ev.image_url}`}
                     uri={ev.image_url && ev.image_url.startsWith('http')
                       ? ev.image_url.trim()
-                      : (ev.image_url ? `${API_CONFIG.UPLOADS_URL}/news/${String(ev.image_url).trim()}` : undefined)}
+                      : (ev.image_url
+                          ? `${API_CONFIG.UPLOADS_URL}/${String(ev.type ?? '').toLowerCase().includes('news') ? 'events' : 'news'}/${String(ev.image_url).trim()}`
+                          : undefined)}
                     style={styles.newsImage}
                     resizeMode="cover"
                   />
