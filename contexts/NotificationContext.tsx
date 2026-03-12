@@ -104,9 +104,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const messagingInstance = getMessagingOrNull();
         if (!messagingInstance) return;
 
+        const messaging = messagingInstance();
+
         // Listen for foreground messages
         try {
-          unsubscribeForeground = messagingInstance().onMessage(async remoteMessage => {
+          if (typeof messaging.onMessage === 'function') {
+            unsubscribeForeground = messaging.onMessage(async remoteMessage => {
           console.log('FCM message received in foreground: Subbu ', remoteMessage);
           
           // Show local notification when app is in foreground
@@ -146,47 +149,62 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           // Refresh notifications when a new one arrives
           fetchNotifications();
           });
-          console.log('✅ Foreground message listener registered');
+            console.log('✅ Foreground message listener registered');
+          } else {
+            console.warn('⚠️ messaging.onMessage is not available');
+          }
         } catch (foregroundError: any) {
           console.error('❌ Error setting up foreground message listener:', foregroundError);
         }
 
         // Handle notification when app is opened from background/quit state
         try {
-          unsubscribeOpenedApp = messagingInstance().onNotificationOpenedApp(remoteMessage => {
+          if (typeof messaging.onNotificationOpenedApp === 'function') {
+            unsubscribeOpenedApp = messaging.onNotificationOpenedApp(remoteMessage => {
             console.log('Notification opened app from background:Subbu ', remoteMessage);
             fetchNotifications();
           });
-          console.log('✅ Background notification listener registered');
+            console.log('✅ Background notification listener registered');
+          } else {
+            console.warn('⚠️ messaging.onNotificationOpenedApp is not available');
+          }
         } catch (backgroundError: any) {
           console.error('❌ Error setting up background notification listener:', backgroundError);
         }
 
         // Check if app was opened from a notification (app was quit)
         try {
-          messagingInstance()
-            .getInitialNotification()
-            .then(remoteMessage => {
-              if (remoteMessage) {
-                console.log('Notification opened app from quit state:', remoteMessage);
-                fetchNotifications();
-              }
-            })
-            .catch((error: any) => {
-              console.error('❌ Error getting initial notification:', error);
-            });
+          if (typeof messaging.getInitialNotification === 'function') {
+            messaging
+              .getInitialNotification()
+              .then(remoteMessage => {
+                if (remoteMessage) {
+                  console.log('Notification opened app from quit state:', remoteMessage);
+                  fetchNotifications();
+                }
+              })
+              .catch((error: any) => {
+                console.error('❌ Error getting initial notification:', error);
+              });
+          } else {
+            console.warn('⚠️ messaging.getInitialNotification is not available (e.g. on Android)');
+          }
         } catch (initialError: any) {
           console.error('❌ Error setting up initial notification check:', initialError);
         }
 
-        // Listen for token refresh
+        // Listen for token refresh (iOS; on Android this may be undefined)
         try {
-          unsubscribeTokenRefresh = messagingInstance().onTokenRefresh(token => {
-            console.log('FCM token refreshed:', token);
-            setFcmToken(token);
-            sendTokenToBackend(token);
-          });
-          console.log('✅ Token refresh listener registered');
+          if (typeof messaging.onTokenRefresh === 'function') {
+            unsubscribeTokenRefresh = messaging.onTokenRefresh(token => {
+              console.log('FCM token refreshed:', token);
+              setFcmToken(token);
+              sendTokenToBackend(token);
+            });
+            console.log('✅ Token refresh listener registered');
+          } else {
+            console.warn('⚠️ messaging.onTokenRefresh is not available (e.g. on Android) – token will still work');
+          }
         } catch (tokenRefreshError: any) {
           console.error('❌ Error setting up token refresh listener:', tokenRefreshError);
         }

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
 const FCM_TOKEN_KEY = '@fcm_token';
 
@@ -488,21 +488,32 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
         return false;
       }
     } else if (Platform.OS === 'android') {
-      if (!isFirebaseAvailable()) return true;
-      // For Android, use Firebase messaging to request permissions
-      // Ensure Firebase is initialized first
-      if (!isFirebaseReady()) {
-        console.log(`[${Platform.OS}] 🔥 Firebase not ready, initializing...`);
-        await initializeFirebase();
+      // messaging().requestPermission() is iOS-only; on Android it's undefined.
+      // On Android 13+ (API 33+), request POST_NOTIFICATIONS at runtime.
+      const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
+      if (apiLevel >= 33) {
+        try {
+          const granted = await PermissionsAndroid.request(
+            'android.permission.POST_NOTIFICATIONS' as never,
+            {
+              title: 'Notification Permission',
+              message: 'This app would like to send you notifications.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          const enabled = granted === PermissionsAndroid.RESULTS.GRANTED;
+          console.log(`[${Platform.OS}] Notification permission:`, granted, `(granted: ${enabled})`);
+          return enabled;
+        } catch (err: any) {
+          console.error(`[${Platform.OS}] Error requesting notification permission:`, err?.message || err);
+          return false;
+        }
       }
-      
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-      
-      console.log(`[${Platform.OS}] Notification permission status:`, authStatus);
-      return enabled;
+      // Android 12 and below: no runtime permission needed, notifications allowed by default
+      console.log(`[${Platform.OS}] Notification permission not required (API ${apiLevel} < 33)`);
+      return true;
     }
     
     return true;
