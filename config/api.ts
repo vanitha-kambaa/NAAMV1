@@ -1,10 +1,10 @@
 export const API_CONFIG = {
   //BASE_URL: 'https://9jlldx6w-9000.inc1.devtunnels.ms/api',
   //UPLOADS_URL: 'https://9jlldx6w-9000.inc1.devtunnels.ms/uploads',
- BASE_URL: 'http://65.0.100.65:8000/api',
-  UPLOADS_URL: 'http://65.0.100.65:8000/uploads',
-//BASE_URL: 'https://app.naamfarmers.org/api',
-//  UPLOADS_URL: 'https://app.naamfarmers.org/uploads',
+ //BASE_URL: 'http://65.0.100.65:8000/api',
+ // UPLOADS_URL: 'http://65.0.100.65:8000/uploads',
+BASE_URL: 'https://app.naamfarmers.org/api',
+UPLOADS_URL: 'https://app.naamfarmers.org/api/uploads',
 
 };
 

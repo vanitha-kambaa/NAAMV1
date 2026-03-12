@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { AppVersionGate } from '@/components/AppVersionGate';
 import FarmerBottomNav, { FARMER_BOTTOM_NAV_BAR_HEIGHT } from '@/components/farmer-bottom-nav';
 import { SideMenuProvider } from '@/components/SideMenu';
 import { LanguageProvider } from '@/contexts/LanguageContext';
@@ -91,6 +92,7 @@ function RootLayoutNav() {
           <FarmerBottomNav />
         </View>
       )}
+      <AppVersionGate />
     </View>
   );
 }
