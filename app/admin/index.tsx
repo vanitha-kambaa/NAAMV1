@@ -1,3 +1,4 @@
+import { HeaderNotificationIcon } from '@/components/HeaderNotificationIcon';
 import { useSideMenu } from '@/components/SideMenu';
 import { ThemedText } from '@/components/themed-text';
 import { API_CONFIG } from '@/config/api';

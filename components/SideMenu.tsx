@@ -1,6 +1,6 @@
 import { RemoteImage } from '@/components/RemoteImage';
 import { ThemedText } from '@/components/themed-text';
-import { API_CONFIG } from '@/config/api';
+import { API_CONFIG, API_ENDPOINTS } from '@/config/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -125,6 +125,7 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion, refreshUser 
   const [feesLoading, setFeesLoading] = useState(false);
   const [premiumFee, setPremiumFee] = useState<{ amount: number; type?: string } | null>(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
   const displayName = user?.fullname || user?.name || user?.first_name || (language === 'ta' ? 'முருகன் குமார்' : 'User Name');
   const displayPhone = user?.mobile_no || user?.mobile || user?.phone || (language === 'ta' ? '9876543210' : '9876543210');
@@ -304,6 +305,64 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion, refreshUser 
     }
   };
 
+  const handleDeleteAccount = () => {
+    const title = language === 'ta' ? 'கணக்கை நீக்கு' : 'Delete Account';
+    const message =
+      language === 'ta'
+        ? 'உங்கள் கணக்கு நிரந்தரமாக நீக்கப்படும். இந்த செயலை மாற்ற முடியாது. தொடர விரும்புகிறீர்களா?'
+        : 'Your account will be permanently deleted. This action cannot be undone. Do you want to continue?';
+    const cancelLabel = language === 'ta' ? 'ரத்து' : 'Cancel';
+    const deleteLabel = language === 'ta' ? 'ஆம், நீக்கு' : 'Yes, Delete';
+
+    Alert.alert(title, message, [
+      { text: cancelLabel, style: 'cancel' },
+      {
+        text: deleteLabel,
+        style: 'destructive',
+        onPress: async () => {
+          setDeleteAccountLoading(true);
+          onClose();
+          try {
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) {
+              Alert.alert(
+                language === 'ta' ? 'பிழை' : 'Error',
+                language === 'ta' ? 'அங்கீகாரம் கிடைக்கவில்லை' : 'Not authenticated'
+              );
+              return;
+            }
+            const res = await fetch(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.DELETE_ACCOUNT}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const json = res.ok ? await res.json().catch(() => ({})) : {};
+            if (res.ok && (json?.status === 'success' || json?.success !== false)) {
+              await AsyncStorage.multiRemove(['authToken', 'userData', 'userInfo', 'profile_images']);
+              Alert.alert(
+                language === 'ta' ? 'கணக்கு நீக்கப்பட்டது' : 'Account Deleted',
+                language === 'ta' ? 'உங்கள் கணக்கு வெற்றிகரமாக நீக்கப்பட்டது.' : 'Your account has been deleted successfully.'
+              );
+              router.replace('/');
+            } else {
+              const errMsg = json?.message || json?.error || (language === 'ta' ? 'கணக்கு நீக்குதல் தோல்வி' : 'Failed to delete account');
+              Alert.alert(language === 'ta' ? 'பிழை' : 'Error', errMsg);
+            }
+          } catch (e: any) {
+            Alert.alert(
+              language === 'ta' ? 'பிழை' : 'Error',
+              e?.message || (language === 'ta' ? 'கணக்கு நீக்குதல் தோல்வி' : 'Failed to delete account')
+            );
+          } finally {
+            setDeleteAccountLoading(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <>
       {isOpen && <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={onClose}><View /></TouchableOpacity>}
@@ -365,7 +424,22 @@ function GlobalSideMenu({ isOpen, onClose, user, profileCompletion, refreshUser 
 
         <View style={styles.menuSeparator} />
 
-        <TouchableOpacity style={styles.menuItem} onPress={async () => { onClose(); await AsyncStorage.removeItem('authToken'); await AsyncStorage.removeItem('userData'); router.replace('/'); }}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleDeleteAccount}
+          disabled={deleteAccountLoading}
+        >
+          <Ionicons name="trash-outline" size={20} color="#dc2626" />
+          <ThemedText style={[styles.menuItemText, { color: '#dc2626' }]}>
+            {language === 'ta' ? 'கணக்கை நீக்கு' : 'Delete Account'}
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={async () => { onClose(); await AsyncStorage.removeItem('authToken'); await AsyncStorage.removeItem('userData'); router.replace('/'); }}
+          disabled={deleteAccountLoading}
+        >
           <Ionicons name="log-out" size={20} color="#ef4444" />
           <ThemedText style={[styles.menuItemText, { color: '#ef4444' }]}>{language === 'ta' ? 'வெளியேறு' : 'Logout'}</ThemedText>
         </TouchableOpacity>

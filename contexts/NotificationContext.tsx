@@ -1,7 +1,6 @@
 import { API_CONFIG } from '@/config/api';
-import { ensureFirebaseReady, getFCMToken, requestNotificationPermissions } from '@/services/fcm';
+import { ensureFirebaseReady, getFCMToken, getMessagingOrNull, isFirebaseAvailable, requestNotificationPermissions } from '@/services/fcm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
@@ -74,10 +73,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           }),
         });
 
-        // Request permissions
+        // Request permissions (expo-notifications on iOS works without Firebase)
         const hasPermission = await requestNotificationPermissions();
         if (!hasPermission) {
           console.log('Notification permission not granted');
+          return;
+        }
+
+        if (!isFirebaseAvailable()) {
+          console.log('Firebase not available (e.g. Expo Go) – skipping FCM');
           return;
         }
 
@@ -94,13 +98,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const firebaseReady = await ensureFirebaseReady();
         if (!firebaseReady) {
           console.warn('⚠️ Firebase not fully ready, but will try to set up listeners anyway');
-          // Wait a bit more
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
+        const messagingInstance = getMessagingOrNull();
+        if (!messagingInstance) return;
+
         // Listen for foreground messages
         try {
-          unsubscribeForeground = messaging().onMessage(async remoteMessage => {
+          unsubscribeForeground = messagingInstance().onMessage(async remoteMessage => {
           console.log('FCM message received in foreground: Subbu ', remoteMessage);
           
           // Show local notification when app is in foreground
@@ -147,7 +153,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         // Handle notification when app is opened from background/quit state
         try {
-          unsubscribeOpenedApp = messaging().onNotificationOpenedApp(remoteMessage => {
+          unsubscribeOpenedApp = messagingInstance().onNotificationOpenedApp(remoteMessage => {
             console.log('Notification opened app from background:Subbu ', remoteMessage);
             fetchNotifications();
           });
@@ -158,7 +164,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         // Check if app was opened from a notification (app was quit)
         try {
-          messaging()
+          messagingInstance()
             .getInitialNotification()
             .then(remoteMessage => {
               if (remoteMessage) {
@@ -175,7 +181,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         // Listen for token refresh
         try {
-          unsubscribeTokenRefresh = messaging().onTokenRefresh(token => {
+          unsubscribeTokenRefresh = messagingInstance().onTokenRefresh(token => {
             console.log('FCM token refreshed:', token);
             setFcmToken(token);
             sendTokenToBackend(token);

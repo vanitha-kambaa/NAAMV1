@@ -1,20 +1,47 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApp } from '@react-native-firebase/app';
-import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
 import { NativeModules, Platform } from 'react-native';
 
 const FCM_TOKEN_KEY = '@fcm_token';
 
+// Lazy-load Firebase only when native module exists (avoids crash in Expo Go)
+let _getApp: (() => any) | null = null;
+let _messaging: (() => any) | null = null;
+try {
+  if (NativeModules.RNFBAppModule) {
+    const firebaseApp = require('@react-native-firebase/app');
+    const firebaseMessaging = require('@react-native-firebase/messaging');
+    _getApp = firebaseApp.getApp;
+    _messaging = () => firebaseMessaging.default;
+  }
+} catch {
+  // Expo Go or Firebase not linked – FCM will be no-op
+}
+
+const getApp = (): any => {
+  if (!_getApp) throw new Error('Firebase not available');
+  return _getApp();
+};
+const messaging = (): any => {
+  if (!_messaging) throw new Error('Firebase not available');
+  return _messaging();
+};
+
+/** Returns Firebase messaging instance or null when running in Expo Go / without native Firebase */
+export const getMessagingOrNull = (): (() => any) | null => _messaging;
+
+export const isFirebaseAvailable = (): boolean => !!_getApp && !!_messaging;
+
 // Check if Firebase is ready
 let firebaseInitialized = false;
 
 export const isFirebaseReady = (): boolean => {
-  return firebaseInitialized;
+  return isFirebaseAvailable() && firebaseInitialized;
 };
 
 // Helper function to ensure Firebase is ready before using messaging()
 export const ensureFirebaseReady = async (): Promise<boolean> => {
+  if (!isFirebaseAvailable()) return false;
   try {
     // If already initialized, verify it's still working
     if (firebaseInitialized) {
@@ -85,6 +112,7 @@ const waitForNativeModule = async (maxRetries = 10, retryDelay = 500): Promise<b
 };
 
 export const initializeFirebase = async (): Promise<void> => {
+  if (!isFirebaseAvailable()) return;
   if (firebaseInitialized) {
     // Double-check Firebase is still accessible
     try {
@@ -237,6 +265,7 @@ const verifyFirebaseMessaging = async (maxRetries = 10, retryDelay = 500): Promi
 };
 
 export const getFCMToken = async (retryCount = 0): Promise<string | null> => {
+  if (!isFirebaseAvailable()) return null;
   try {
     console.log(`[${Platform.OS}] 🔥 Starting FCM token retrieval (attempt ${retryCount + 1})...`);
     
@@ -459,6 +488,7 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
         return false;
       }
     } else if (Platform.OS === 'android') {
+      if (!isFirebaseAvailable()) return true;
       // For Android, use Firebase messaging to request permissions
       // Ensure Firebase is initialized first
       if (!isFirebaseReady()) {
@@ -487,6 +517,7 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
 // Background message handler for FCM
 // This handles notifications when the app is in the background or terminated
 export const registerBackgroundMessageHandler = () => {
+  if (!isFirebaseAvailable()) return;
   try {
     // Check if Firebase is initialized before registering handler
     const app = getApp();

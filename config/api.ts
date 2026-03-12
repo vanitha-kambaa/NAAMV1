@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
   PROFILE: '/users/profile',
   LAND_DETAILS: '/users/land-details/farmer',
   UPDATE_LAND_DETAILS: '/users/land-details',
+  DELETE_ACCOUNT: '/delete-account',
   
   // Events endpoints
   UPCOMING_EVENTS: '/upcoming-events',
