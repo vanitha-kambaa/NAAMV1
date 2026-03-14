@@ -203,7 +203,7 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
         return metroURL
       }
     }
-    print("❌ Physical device: RCTMetroHost not set. Rebuild with: npx expo run:ios. If URL is set but request times out: (1) Run Metro with: npm run start:device (2) Allow Local Network when iOS prompts (3) Ensure iPhone and Mac are on same Wi‑Fi (4) macOS: allow Node in Firewall if needed.")
+    print("❌ Physical device: RCTMetroHost not set. Rebuild with: npx expo run:ios. If URL is set but connection fails: (1) Run Metro with: npm start (or npm run start:ios) (2) Tap Allow when iOS shows Local Network permission (3) Same Wi‑Fi for iPhone and Mac (4) macOS: System Settings > Network > Firewall > allow Node/incoming on port 8081 (5) Or use: npm run start:tunnel")
     #endif
     return nil
     #else

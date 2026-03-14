@@ -2,45 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
-
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
-
 	<key>CFBundleDisplayName</key>
 	<string>Naam Farmers</string>
-
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
-
 	<key>CFBundleVersion</key>
-	<string>3</string>
-
+	<string>6</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
-
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-
-	<!-- Allow ONLY your production server -->
-	<!-- NSAllowsLocalNetworking: required for Metro bundler on physical device (dev only) -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -58,61 +43,39 @@
 			</dict>
 		</dict>
 	</dict>
-
-	<!-- React Native -->
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<!-- For physical device dev: set to your Mac's IP (e.g. 192.168.1.100) so Metro can connect -->
 	<key>RCTMetroHost</key>
 	<string></string>
-
-	<!-- Launch Screen -->
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
-
-	<!-- Device Capability -->
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
 	</array>
-
-	<!-- Camera Permission -->
 	<key>NSCameraUsageDescription</key>
 	<string>We use the camera to capture profile and KYC photos for verification.</string>
-
-	<!-- Photo Library Permission -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We use your photo library to upload profile and KYC images.</string>
-
-	<!-- Photo Add Permission -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We may save images to your photo library when required.</string>
-
-	<!-- Location Permission -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to show nearby services and improve your experience.</string>
-
-	<!-- Local Network Permission (required for Metro bundler on physical device during dev) -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Naam Farmers needs local network access to connect to the development server on your computer when testing the app.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>
 	</array>
-
-	<!-- Status Bar -->
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleDefault</string>
-
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-
 </dict>
 </plist>

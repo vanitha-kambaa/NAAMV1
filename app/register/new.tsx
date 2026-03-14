@@ -385,6 +385,11 @@ export default function NewRegistration() {
     }
   };
 
+  // iOS: App Store requires IAP for in-app payments; show message and allow registration without payment
+  const IOS_PAYMENT_UNAVAILABLE_MSG = language === 'ta'
+    ? 'App Store வழிகாட்டுதல்களின் காரணமாக iOS பயன்பாட்டில் பதிவு கட்டணம் கிடைக்கவில்லை. தயவுசெய்து எங்கள் இணையதளம் அல்லது Android பயன்பாட்டைப் பயன்படுத்தி பிரீமியம் பதிவை முடிக்கவும்.'
+    : 'Registration payment is not available on the iOS app due to App Store guidelines. Please complete your premium registration using our website or the Android app.';
+
   // Handle complete button click - check selected type's reg_fees_enable
   const handleCompleteClick = async () => {
     if (!selectedFeeType) {
@@ -392,8 +397,26 @@ export default function NewRegistration() {
       return;
     }
     try {
-      if (selectedFeeType.reg_fees_enable === 1 && parseFloat(selectedFeeType.reg_fees || '0') > 0) {
-        // Show fee confirmation modal, then Razorpay
+      const isPaidType = selectedFeeType.reg_fees_enable === 1 && parseFloat(selectedFeeType.reg_fees || '0') > 0;
+      if (isPaidType && Platform.OS === 'ios') {
+        // iOS: no in-app payment (App Store requires IAP); show message and register without payment
+        Alert.alert(
+          language === 'ta' ? 'கட்டணம் iOS இல் கிடைக்கவில்லை' : 'Payment not available on iOS',
+          IOS_PAYMENT_UNAVAILABLE_MSG,
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                const userId = await registerUser();
+                if (userId) await navigateAfterRegistration(userId);
+              },
+            },
+          ]
+        );
+        return;
+      }
+      if (isPaidType) {
+        // Android: Show fee confirmation modal, then Razorpay
         setShowFeeConfirmModal(true);
       } else {
         // No fee required, directly register and navigate

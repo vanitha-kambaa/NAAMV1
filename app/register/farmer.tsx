@@ -889,8 +889,26 @@ export default function FarmerRegister() {
           const token = registerResult.data.token || registerResult.token;
           setRegistrationResult({ user: userData, token });
           
-          // Initiate Razorpay payment
-          if (farmerFee && farmerFee > 0) {
+          // iOS: App Store requires IAP; show message and complete registration without payment
+          if (farmerFee && farmerFee > 0 && Platform.OS === 'ios') {
+            const iosMsg = language === 'ta'
+              ? 'App Store வழிகாட்டுதல்களின் காரணமாக iOS பயன்பாட்டில் பதிவு கட்டணம் கிடைக்கவில்லை. தயவுசெய்து எங்கள் இணையதளம் அல்லது Android பயன்பாட்டைப் பயன்படுத்தி பிரீமியம் பதிவை முடிக்கவும்.'
+              : 'Registration payment is not available on the iOS app due to App Store guidelines. Please complete your premium registration using our website or the Android app.';
+            Alert.alert(
+              language === 'ta' ? 'கட்டணம் iOS இல் கிடைக்கவில்லை' : 'Payment not available on iOS',
+              iosMsg,
+              [
+                {
+                  text: 'OK',
+                  onPress: async () => {
+                    await storeUserData(userData, token);
+                    router.replace('/dashboard');
+                  },
+                },
+              ]
+            );
+          } else if (farmerFee && farmerFee > 0) {
+            // Android: Initiate Razorpay payment
             initiatePayment(registerResult.data.user.id, farmerFee);
           } else {
             // No payment required - store user data and redirect to dashboard

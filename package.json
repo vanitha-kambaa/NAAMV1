@@ -3,8 +3,10 @@
   "main": "expo-router/entry",
   "version": "1.3.0",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --lan",
     "start:device": "expo start --lan",
+    "start:ios": "REACT_NATIVE_PACKAGER_HOSTNAME=$(node -e \"const os=require('os');const n=os.networkInterfaces();const a=Object.keys(n).flatMap(k=>n[k]).find(i=>!i.internal&&i.family==='IPv4');console.log(a?a.address:'localhost')\") expo start --lan",
+    "start:tunnel": "expo start --tunnel",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",

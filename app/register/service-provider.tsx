@@ -510,7 +510,17 @@ export default function ServiceProviderRegister() {
           
           // Get fee from API and initiate payment
           const fee = await apiService.getFees();
-          if (fee > 0) {
+          if (fee > 0 && Platform.OS === 'ios') {
+            // iOS: App Store requires IAP; show message and complete without in-app payment
+            const iosMsg = language === 'ta'
+              ? 'App Store வழிகாட்டுதல்களின் காரணமாக iOS பயன்பாட்டில் பதிவு கட்டணம் கிடைக்கவில்லை. தயவுசெய்து எங்கள் இணையதளம் அல்லது Android பயன்பாட்டைப் பயன்படுத்தி பிரீமியம் பதிவை முடிக்கவும்.'
+              : 'Registration payment is not available on the iOS app due to App Store guidelines. Please complete your premium registration using our website or the Android app.';
+            Alert.alert(
+              language === 'ta' ? 'கட்டணம் iOS இல் கிடைக்கவில்லை' : 'Payment not available on iOS',
+              iosMsg,
+              [{ text: 'OK', onPress: () => router.replace('/dashboard') }]
+            );
+          } else if (fee > 0) {
             initiatePayment(registerResult.data.id, fee);
           } else {
             Alert.alert(t('registration_successful'), t('welcome_naam'), [
